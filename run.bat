@@ -1,0 +1,1 @@
+@start qemu-system-x86_64 -cpu Haswell -drive if=pflash,format=raw,readonly=on,file=OVMF\OVMF_CODE_4M.fd -drive if=pflash,format=raw,file=OVMF\OVMF_VARS_4M.fd -drive file=fat:rw:fatroot,format=raw,if=none,id=nvme0 -device nvme,drive=nvme0,serial=1234 -m 1G -serial stdio -d in_asm,cpu_reset,int -D qemu.log

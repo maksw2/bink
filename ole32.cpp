@@ -1,44 +1,43 @@
-typedef void* HWND;
+#include <efi.h>
+#include <efilib.h>
+#include "print.h"
+
 typedef void* LPUNKNOWN;
 typedef void* REFIID;
 typedef void* REFCLSID;
 typedef long HRESULT;
 typedef unsigned long DWORD;
-typedef unsigned int UINT;
 typedef int BOOL;
-typedef void* HANDLE;
 typedef void* LPVOID;
-typedef long LONG;
-typedef long LONG_PTR;
-typedef const char* LPCSTR;
-typedef size_t SIZE_T;
 typedef void* HMODULE;
-typedef HMODULE HINSTANCE;
-typedef void* FARPROC;
-typedef DWORD (*LPTHREAD_START_ROUTINE)(LPVOID lpThreadParameter);
-typedef union _LARGE_INTEGER {
-    struct {
-        unsigned long LowPart;
-        long HighPart;
-    };
-    long long QuadPart;
-} LARGE_INTEGER;
 #define S_OK ((HRESULT)0L)
-#define TRUE 1
-#define FALSE 0
-
-extern "C" {
 
 // COM stubs
-__declspec(dllexport) HRESULT CoCreateInstance(REFCLSID, LPUNKNOWN, DWORD, REFIID, LPVOID* ppv) {
+HRESULT CoCreateInstance(REFCLSID, LPUNKNOWN, DWORD, REFIID, LPVOID* ppv) {
+    PRINT(L"CoCreateInstance called\n");
     if (ppv) *ppv = nullptr;
     return S_OK;
 }
-__declspec(dllexport) HRESULT CoInitializeEx(LPVOID, DWORD) { return S_OK; }
-__declspec(dllexport) void CoUninitialize() {}
-__declspec(dllexport) void CoTaskMemFree(LPVOID) {}
-__declspec(dllexport) HRESULT PropVariantClear(LPVOID) { return S_OK; }
+HRESULT CoInitializeEx(LPVOID, DWORD) { PRINT(L"CoInitializeEx called\n"); return S_OK; }
+void CoUninitialize() { PRINT(L"CoUninitialize called\n"); }
+void CoTaskMemFree(LPVOID) { PRINT(L"CoTaskMemFree called\n"); }
+HRESULT PropVariantClear(LPVOID) { PRINT(L"PropVariantClear called\n"); return S_OK; }
 
-BOOL DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) { return TRUE; }
+extern int stricmp(const char *s1, const char *s2);
 
+void* ResolveOle32(const char* functionName) {
+    if (stricmp(functionName, "CoCreateInstance") == 0) {
+        return CoCreateInstance;
+    } else if (stricmp(functionName, "CoInitializeEx") == 0) {
+        return CoInitializeEx;
+    } else if (stricmp(functionName, "CoUninitialize") == 0) {
+        return CoUninitialize;
+    } else if (stricmp(functionName, "CoTaskMemFree") == 0) {
+        return CoTaskMemFree;
+    } else if (stricmp(functionName, "PropVariantClear") == 0) {
+        return PropVariantClear;
+    }
+    
+    Print(L"Unknown function: %a\n", functionName);
+    return NULL;
 }

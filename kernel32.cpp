@@ -1,3 +1,9 @@
+#include <efi.h>
+#include <efilib.h>
+#include <intrin.h>
+#include "print.h"
+
+#pragma region types
 typedef void* HWND;
 typedef void* LPUNKNOWN;
 typedef void* REFIID;
@@ -8,14 +14,17 @@ typedef unsigned int UINT;
 typedef int BOOL;
 typedef void* HANDLE;
 typedef void* LPVOID;
+typedef const void* LPCVOID;
 typedef long LONG;
 typedef long LONG_PTR;
+typedef char* LPSTR;
 typedef const char* LPCSTR;
 typedef size_t SIZE_T;
 typedef void* HMODULE;
 typedef HMODULE HINSTANCE;
 typedef void* FARPROC;
 typedef DWORD (*LPTHREAD_START_ROUTINE)(LPVOID lpThreadParameter);
+
 typedef union _LARGE_INTEGER {
     struct {
         unsigned long LowPart;
@@ -23,230 +32,865 @@ typedef union _LARGE_INTEGER {
     };
     long long QuadPart;
 } LARGE_INTEGER;
-#define S_OK ((HRESULT)0L)
-#define TRUE 1
-#define FALSE 0
-#include <cstdlib>
-#include <cstdint>
 
-extern "C" {
+typedef int BOOL;
+typedef unsigned long DWORD;
+typedef void* LPVOID;
+typedef LPVOID LPCRITICAL_SECTION;
 
-typedef HANDLE (*HeapCreate_t)(DWORD, SIZE_T, SIZE_T);
-typedef BOOL (*HeapDestroy_t)(HANDLE);
-typedef LPVOID (*HeapAlloc_t)(HANDLE, DWORD, SIZE_T);
-typedef BOOL (*HeapFree_t)(HANDLE, DWORD, LPVOID);
-typedef LPVOID (*HeapReAlloc_t)(HANDLE a, DWORD b, LPVOID c, SIZE_T d);
+// Basic types
+typedef void* PVOID;
+typedef unsigned long DWORD;
+typedef int BOOL;
+typedef unsigned int UINT;
+typedef unsigned short USHORT;
+typedef unsigned long long ULONG64;
+typedef unsigned long ULONG;
+typedef void* HANDLE;
+typedef long LONG;
+typedef unsigned short WORD;
+typedef unsigned char BYTE;
+typedef long LONG_PTR;
+typedef unsigned long long ULONG_PTR;
+typedef unsigned char* LPBYTE;
+typedef ULONG_PTR DWORD_PTR;
 
-HeapCreate_t pHeapCreate = nullptr;
-HeapDestroy_t pHeapDestroy = nullptr;
-HeapAlloc_t pHeapAlloc = nullptr;
-HeapFree_t pHeapFree  = nullptr;
-HeapReAlloc_t pHeapReAlloc = nullptr;
-    
-// Memory
-__declspec(dllexport) HANDLE HeapCreate(DWORD a, SIZE_T b, SIZE_T c) { return pHeapCreate(a, b, c); }
-__declspec(dllexport) BOOL HeapDestroy(HANDLE a) { return pHeapDestroy(a); }
-__declspec(dllexport) LPVOID HeapAlloc(HANDLE a, DWORD b, SIZE_T c) { return pHeapAlloc(a, b, c); }
-__declspec(dllexport) BOOL HeapFree(HANDLE a, DWORD b, LPVOID c) { return pHeapFree(a, b, c); }
-__declspec(dllexport) LPVOID HeapReAlloc(HANDLE a, DWORD b, LPVOID c, SIZE_T d) { return pHeapReAlloc(a, b, c, d); }
+// Pointer to Const types
+typedef const char* LPCSTR;
+typedef const char* LPCTSTR;
+typedef const void* LPCVOID;
+typedef const wchar_t* LPCWSTR;
 
-// Threads (fake)
-__declspec(dllexport) DWORD GetCurrentThreadId() { return 1; }
-__declspec(dllexport) HANDLE GetCurrentThread() { return (HANDLE)1; }
-__declspec(dllexport) HANDLE CreateThread(void*, SIZE_T, LPTHREAD_START_ROUTINE, void*, DWORD, DWORD*) { return (HANDLE)1; }
-__declspec(dllexport) DWORD WaitForSingleObject(HANDLE, DWORD) { return 0; }
-__declspec(dllexport) BOOL CloseHandle(HANDLE) { return 1; }
+// Pointers to variables
+typedef DWORD* LPDWORD;
+typedef long* PLONG;
+typedef char* LPSTR;
+typedef char* LPCH;
+typedef wchar_t* LPWSTR;
+typedef wchar_t* LPWCH;
+typedef BOOL* LPBOOL;
+typedef void* LPVOID;
+typedef void* HMODULE;
 
-typedef DWORD (*GetTickCount_t)();
-typedef BOOL (*QueryPerformanceCounter_t)(LARGE_INTEGER* li);
-typedef BOOL (*QueryPerformanceFrequency_t)(LARGE_INTEGER* li);
+typedef long* LPLONG;
+typedef ULONG64* PULONG64;
 
-GetTickCount_t pGetTickCount = nullptr;
-QueryPerformanceCounter_t pQueryPerformanceCounter = nullptr;
-QueryPerformanceFrequency_t pQueryPerformanceFrequency = nullptr;
+// Structures and callbacks
+typedef struct _SECURITY_ATTRIBUTES {
+    DWORD nLength;
+    LPVOID lpSecurityDescriptor;
+    BOOL bInheritHandle;
+} SECURITY_ATTRIBUTES, *LPSECURITY_ATTRIBUTES;
 
-// Timing
-__declspec(dllexport) DWORD GetTickCount() {
-    return pGetTickCount();
-}
+typedef struct _OVERLAPPED {
+    ULONG_PTR Internal;
+    ULONG_PTR InternalHigh;
+    DWORD Offset;
+    DWORD OffsetHigh;
+    HANDLE hEvent;
+} OVERLAPPED, *LPOVERLAPPED;
 
-__declspec(dllexport) BOOL QueryPerformanceCounter(LARGE_INTEGER* li) {
-    return pQueryPerformanceCounter(li);
-}
+typedef struct _STARTUPINFOA {
+    DWORD cb;
+    LPSTR lpReserved;
+    LPSTR lpDesktop;
+    LPSTR lpTitle;
+    DWORD dwX;
+    DWORD dwY;
+    DWORD dwXSize;
+    DWORD dwYSize;
+    DWORD dwXCountChars;
+    DWORD dwYCountChars;
+    DWORD dwFillAttribute;
+    DWORD dwFlags;
+    USHORT wShowWindow;
+    USHORT cbReserved2;
+    LPBYTE lpReserved2;
+    HANDLE hStdInput;
+    HANDLE hStdOutput;
+    HANDLE hStdError;
+} STARTUPINFOA, *LPSTARTUPINFOA;
 
-__declspec(dllexport) BOOL QueryPerformanceFrequency(LARGE_INTEGER* li) {
-    return pQueryPerformanceFrequency(li);
-}
+typedef struct _FILETIME {
+    DWORD dwLowDateTime;
+    DWORD dwHighDateTime;
+} FILETIME, *LPFILETIME;
 
-// Module / file
-__declspec(dllexport) HMODULE GetModuleHandleA(LPCSTR) { return (HMODULE)1; }
-__declspec(dllexport) FARPROC GetProcAddress(HMODULE, LPCSTR) { return nullptr; }
-__declspec(dllexport) HMODULE LoadLibraryA(LPCSTR) { return (HMODULE)1; }
+typedef struct _CPINFO {
+    UINT MaxCharSize;
+    BYTE DefaultChar[2];
+    BYTE LeadByte[12];
+} CPINFO, *LPCPINFO;
 
-// Process
-__declspec(dllexport) DWORD GetCurrentProcessId() { return 1; }
-__declspec(dllexport) HANDLE GetCurrentProcess() { return (HANDLE)1; }
-__declspec(dllexport) void ExitProcess(UINT) { while(1); }
+typedef unsigned short* LPWORD;
+typedef char* PSTR;
 
-typedef void (*OutputDebugStringA_t)(LPCSTR lpOutputString);
+// Function pointer for Fiber Local Storage callback
+typedef void (*PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
 
-OutputDebugStringA_t pOutputDebugStringA = nullptr;
+// Heap information enumeration
+typedef enum _HEAP_INFORMATION_CLASS {
+    HeapCompatibilityInformation,
+    HeapEnableTerminationOnCorruption
+} HEAP_INFORMATION_CLASS;
 
-__declspec(dllexport) void OutputDebugStringA(LPCSTR lpOutputString) {
-    pOutputDebugStringA(lpOutputString);
-}
+typedef struct _SYSTEM_INFO {
+    union {
+        DWORD dwOemId;
+        struct {
+            WORD wProcessorArchitecture;
+            WORD wReserved;
+        } DUMMYSTRUCTNAME;
+    } DUMMYUNIONNAME;
+    DWORD dwPageSize;
+    LPVOID lpMinimumApplicationAddress;
+    LPVOID lpMaximumApplicationAddress;
+    DWORD_PTR dwActiveProcessorMask;
+    DWORD dwNumberOfProcessors;
+    DWORD dwProcessorType;
+    DWORD dwAllocationGranularity;
+    WORD wProcessorLevel;
+    WORD wProcessorRevision;
+} SYSTEM_INFO, *LPSYSTEM_INFO;
 
-HMODULE LoadLibraryExA(LPCSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
+// Exception handling types
+typedef PVOID PVECTORED_EXCEPTION_HANDLER;
+typedef struct _CONTEXT {} CONTEXT, *PCONTEXT;
+typedef struct _RUNTIME_FUNCTION {} RUNTIME_FUNCTION, *PRUNTIME_FUNCTION;
+typedef LONG(*LPTOP_LEVEL_EXCEPTION_FILTER)(PVOID ExceptionInfo);
 
-#define IMAGE_DOS_SIGNATURE 0x5A4D      // MZ
-#define IMAGE_NT_SIGNATURE  0x00004550  // PE00
-#define IMAGE_DIRECTORY_ENTRY_EXPORT 0
+// Locale and Codepage types
+typedef DWORD LCID;
+typedef DWORD LCTYPE;
+#pragma endregion
 
-struct IMAGE_DOS_HEADER {
-    uint16_t e_magic;
-    uint16_t e_cblp;
-    uint16_t e_cp;
-    uint16_t e_crlc;
-    uint16_t e_cparhdr;
-    uint16_t e_minalloc;
-    uint16_t e_maxalloc;
-    uint16_t e_ss;
-    uint16_t e_sp;
-    uint16_t e_csum;
-    uint16_t e_ip;
-    uint16_t e_cs;
-    uint16_t e_lfarlc;
-    uint16_t e_ovno;
-    uint16_t e_res[4];
-    uint16_t e_oemid;
-    uint16_t e_oeminfo;
-    uint16_t e_res2[10];
-    uint32_t e_lfanew;
-};
-
-struct IMAGE_FILE_HEADER {
-    uint16_t Machine;
-    uint16_t NumberOfSections;
-    uint32_t TimeDateStamp;
-    uint32_t PointerToSymbolTable;
-    uint32_t NumberOfSymbols;
-    uint16_t SizeOfOptionalHeader;
-    uint16_t Characteristics;
-};
-
-struct IMAGE_DATA_DIRECTORY {
-    uint32_t VirtualAddress;
-    uint32_t Size;
-};
-
-struct IMAGE_OPTIONAL_HEADER64 {
-    uint16_t Magic;
-    uint8_t  MajorLinkerVersion;
-    uint8_t  MinorLinkerVersion;
-    uint32_t SizeOfCode;
-    uint32_t SizeOfInitializedData;
-    uint32_t SizeOfUninitializedData;
-    uint32_t AddressOfEntryPoint;
-    uint32_t BaseOfCode;
-    uint64_t ImageBase;
-    uint32_t SectionAlignment;
-    uint32_t FileAlignment;
-    uint16_t MajorOperatingSystemVersion;
-    uint16_t MinorOperatingSystemVersion;
-    uint16_t MajorImageVersion;
-    uint16_t MinorImageVersion;
-    uint16_t MajorSubsystemVersion;
-    uint16_t MinorSubsystemVersion;
-    uint32_t Win32VersionValue;
-    uint32_t SizeOfImage;
-    uint32_t SizeOfHeaders;
-    uint32_t CheckSum;
-    uint16_t Subsystem;
-    uint16_t DllCharacteristics;
-    uint64_t SizeOfStackReserve;
-    uint64_t SizeOfStackCommit;
-    uint64_t SizeOfHeapReserve;
-    uint64_t SizeOfHeapCommit;
-    uint32_t LoaderFlags;
-    uint32_t NumberOfRvaAndSizes;
-    IMAGE_DATA_DIRECTORY DataDirectory[16];
-};
-
-struct IMAGE_NT_HEADERS64 {
-    uint32_t Signature;
-    IMAGE_FILE_HEADER FileHeader;
-    IMAGE_OPTIONAL_HEADER64 OptionalHeader;
-};
-
-struct IMAGE_EXPORT_DIRECTORY {
-    uint32_t Characteristics;
-    uint32_t TimeDateStamp;
-    uint16_t MajorVersion;
-    uint16_t MinorVersion;
-    uint32_t Name;
-    uint32_t Base;
-    uint32_t NumberOfFunctions;
-    uint32_t NumberOfNames;
-    uint32_t AddressOfFunctions;     // RVA from base of image
-    uint32_t AddressOfNames;         // RVA from base of image
-    uint32_t AddressOfNameOrdinals;  // RVA from base of image
-};
-
-int strcmp(const char* a, const char* b) {
-    while (*a && (*a == *b)) {
-        ++a;
-        ++b;
-    }
-    return static_cast<unsigned char>(*a) - static_cast<unsigned char>(*b);
-}
-
-FARPROC GetRealGetProcAddress(HMODULE hModule) {
-    auto base = reinterpret_cast<uint8_t*>(hModule);
-    auto dos = reinterpret_cast<IMAGE_DOS_HEADER*>(base);
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE) return nullptr;
-
-    auto nt = reinterpret_cast<IMAGE_NT_HEADERS64*>(base + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE) return nullptr;
-
-    auto exportDirRVA = nt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-    auto exportDir = reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(base + exportDirRVA);
-
-    auto names = reinterpret_cast<uint32_t*>(base + exportDir->AddressOfNames);
-    auto ordinals = reinterpret_cast<uint16_t*>(base + exportDir->AddressOfNameOrdinals);
-    auto functions = reinterpret_cast<uint32_t*>(base + exportDir->AddressOfFunctions);
-
-    for (uint32_t i = 0; i < exportDir->NumberOfNames; i++) {
-        const char* name = reinterpret_cast<const char*>(base + names[i]);
-        if (strcmp(name, "GetProcAddress") == 0) {
-            uint16_t ord = ordinals[i];
-            uint32_t funcRVA = functions[ord];
-            return reinterpret_cast<FARPROC>(base + funcRVA);
-        }
-    }
+// --- Memory ---
+HANDLE HeapCreate(DWORD, SIZE_T, SIZE_T) {
+    PRINT(L"Called: HeapCreate\n");
     return nullptr;
 }
 
-typedef FARPROC (*GetProcAddress_t)(HMODULE, LPCSTR);
-GetProcAddress_t pGetProcAddress = nullptr;
+BOOL HeapDestroy(HANDLE) {
+    PRINT(L"Called: HeapDestroy\n");
+    return TRUE; // nothing to do
+}
 
-BOOL DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
-    if (fdwReason == 1) { // DLL_PROCESS_ATTACH
-        HMODULE kernel32 = LoadLibraryExA("kernel32.dll", NULL, 0x00000800);
-        pGetProcAddress = (GetProcAddress_t)GetRealGetProcAddress(kernel32);
+LPVOID HeapAlloc(HANDLE, DWORD, SIZE_T size) {
+    PRINT(L"Called: HeapAlloc with size: %ull\n", size);
+    return AllocatePool(size);
+}
 
-        pHeapCreate = (HeapCreate_t)pGetProcAddress(kernel32, "HeapCreate");
-        pHeapDestroy = (HeapDestroy_t)pGetProcAddress(kernel32, "HeapDestroy");
-        pHeapAlloc = (HeapAlloc_t)pGetProcAddress(kernel32, "HeapAlloc");
-        pHeapFree = (HeapFree_t)pGetProcAddress(kernel32, "HeapFree");
-        pHeapReAlloc = (HeapReAlloc_t)pGetProcAddress(kernel32, "HeapReAlloc");
-
-        pGetTickCount = (GetTickCount_t)pGetProcAddress(kernel32, "GetTickCount");
-        pQueryPerformanceCounter = (QueryPerformanceCounter_t)pGetProcAddress(kernel32, "QueryPerformanceCounter");
-        pQueryPerformanceFrequency = (QueryPerformanceFrequency_t)pGetProcAddress(kernel32, "QueryPerformanceFrequency");
-
-        pOutputDebugStringA = (OutputDebugStringA_t)pGetProcAddress(kernel32, "OutputDebugStringA");
-    }
+BOOL HeapFree(HANDLE, DWORD, LPVOID ptr) {
+    PRINT(L"Called: HeapFree with ptr: %p\n", ptr);
+    if (ptr)
+        FreePool(ptr);
     return TRUE;
 }
 
+LPVOID HeapReAlloc(HANDLE, DWORD, LPVOID ptr, SIZE_T size) {
+    PRINT(L"Called: HeapReAlloc with size: %ull and ptr: %p\n", size, ptr);
+    if (!ptr) return AllocatePool(size);
+    LPVOID newPtr = AllocatePool(size);
+    if (!newPtr) return nullptr;
+    // No original size info; can't fully emulate, user must handle
+    CopyMem(newPtr, ptr, size);
+    FreePool(ptr);
+    return newPtr;
+}
+
+SIZE_T HeapSize(HANDLE, DWORD, LPCVOID) {
+    PRINT(L"Called: HeapSize\n");
+    return 0;
+}
+
+// --- Threads (fake, UEFI is single-threaded at boot) ---
+HANDLE GetCurrentThread() {
+    PRINT(L"Called: GetCurrentThread\n");
+    return reinterpret_cast<HANDLE>(1);
+}
+
+HANDLE CreateThread(void*, SIZE_T, LPTHREAD_START_ROUTINE, void*, DWORD, DWORD*) {
+    PRINT(L"Called: CreateThread\n");
+    return reinterpret_cast<HANDLE>(1);
+}
+
+DWORD WaitForSingleObject(HANDLE, DWORD) {
+    PRINT(L"Called: WaitForSingleObject\n");
+    return 0;
+}
+
+// --- Timing ---
+static unsigned long long tsc_freq = 0;
+
+static void init_tsc_freq() {
+    int cpuInfo[4] = {0};
+    __cpuid(cpuInfo, 0x15);
+
+    if (cpuInfo[0] && cpuInfo[1]) {
+        // leaf 0x15 gives: eax = denom, ebx = numer, ecx = crystal Hz
+        unsigned eax = cpuInfo[0]; // denom
+        unsigned ebx = cpuInfo[1]; // numer
+        unsigned ecx = cpuInfo[2]; // crystal freq Hz
+
+        if (ecx != 0) {
+            tsc_freq = (unsigned long long)ecx * ebx / eax;
+            return;
+        }
+    }
+
+    // fallback: CPUID 0x16 (nominal core frequency MHz)
+    __cpuid(cpuInfo, 0x16);
+    if (cpuInfo[0]) {
+        tsc_freq = (unsigned long long)cpuInfo[0] * 1000000ULL;
+    }
+}
+
+BOOL QueryPerformanceCounter(LARGE_INTEGER *li) {
+    if (!tsc_freq) init_tsc_freq();
+    unsigned long long tsc = __rdtsc();
+    // convert to microseconds
+    li->QuadPart = (tsc * 1000000ULL) / tsc_freq;
+    return TRUE;
+}
+
+BOOL QueryPerformanceFrequency(LARGE_INTEGER *li) {
+    if (!tsc_freq) init_tsc_freq();
+    // frequency in Hz (ticks per second)
+    li->QuadPart = 1000000ULL; // since we convert to µs above
+    return TRUE;
+}
+
+DWORD GetTickCount() {
+    LARGE_INTEGER counter;
+    QueryPerformanceCounter(&counter);
+    return (DWORD)(counter.QuadPart / 1000ULL); // ms
+}
+
+// --- Module / File ---
+HMODULE GetModuleHandleA(LPCSTR name) {
+    PRINT(L"Called: GetModuleHandleA with name: %a\n", name);
+    return reinterpret_cast<HMODULE>(1);
+}
+
+FARPROC GetProcAddress(HMODULE, LPCSTR func) {
+    PRINT(L"Called: GetProcAddress with string: %a\n", func);
+    return nullptr;
+}
+
+HMODULE LoadLibraryA(LPCSTR) {
+    PRINT(L"Called: LoadLibraryA\n");
+    return reinterpret_cast<HMODULE>(1);
+}
+
+// --- Process ---
+DWORD GetCurrentProcessId() {
+    PRINT(L"Called: GetCurrentProcessId\n");
+    return 1;
+}
+
+void ExitProcess(UINT uExitCode) {
+    PRINT(L"Called: ExitProcess\n");
+    while(1); // halt
+}
+
+BOOL InitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection, DWORD dwSpinCount) {
+    PRINT(L"Called: InitializeCriticalSectionAndSpinCount\n");
+    return TRUE;
+}
+
+DWORD GetSystemDirectoryA(LPSTR lpBuffer, DWORD uSize) {
+    PRINT(L"Called: GetSystemDirectoryA\n");
+    if (lpBuffer && uSize > 0) {
+        *lpBuffer = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+DWORD GetWindowsDirectoryA(LPSTR lpBuffer, DWORD uSize) {
+    PRINT(L"Called: GetWindowsDirectoryA\n");
+    if (lpBuffer && uSize > 0) {
+        *lpBuffer = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize) {
+    PRINT(L"Called: GetModuleFileNameA\n");
+    if (lpFilename && nSize > 0) {
+        *lpFilename = '\0';
+        return 1;
+    }
+    return 0;
+}
+
+void Sleep(DWORD dwMilliseconds) {
+    PRINT(L"Called: Sleep\n");
+    UINTN microseconds = (UINTN)dwMilliseconds * 1000;
+    BS->Stall(microseconds);
+}
+
+DWORD SetErrorMode(DWORD uMode) {
+    PRINT(L"Called: SetErrorMode\n");
+    return 0;
+}
+
+DWORD GetEnvironmentVariableA(LPCTSTR lpName, LPSTR lpBuffer, DWORD nSize) {
+    PRINT(L"Called: GetEnvironmentVariableA\n");
+    if (lpBuffer && nSize > 0) lpBuffer[0] = 0;
+    return 1;
+}
+
+BOOL CloseHandle(HANDLE hObject) {
+    PRINT(L"Called: CloseHandle\n");
+    return TRUE;
+}
+
+DWORD GetLastError() {
+    PRINT(L"Called: GetLastError\n");
+    return 0;
+}
+
+DWORD GetFileSize(HANDLE hFile, LPDWORD lpFileSizeHigh) {
+    PRINT(L"Called: GetFileSize\n");
+    if (lpFileSizeHigh) *lpFileSizeHigh = 0;
+    return 0;
+}
+
+HANDLE CreateFileA(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
+    PRINT(L"Called: CreateFileA\n");
+    return NULL;
+}
+
+BOOL ReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) {
+    PRINT(L"Called: ReadFile\n");
+    *lpNumberOfBytesRead = 0;
+    return TRUE;
+}
+
+DWORD SetFilePointer(HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod) {
+    PRINT(L"Called: SetFilePointer\n");
+    return 0;
+}
+
+BOOL FreeLibrary(HMODULE hLibModule) {
+    PRINT(L"Called: FreeLibrary\n");
+    return TRUE;
+}
+
+int GetThreadPriority(HANDLE hThread) {
+    PRINT(L"Called: GetThreadPriority\n");
+    return 0;
+}
+
+PVOID RemoveVectoredExceptionHandler(PVOID Handle) {
+    PRINT(L"Called: RemoveVectoredExceptionHandler\n");
+    return NULL;
+}
+
+void RaiseException(DWORD dwExceptionCode, DWORD dwExceptionFlags, DWORD nNumberOfArguments, const ULONG_PTR* lpArguments) {
+    PRINT(L"Called: RaiseException\n");
+    return;
+}
+
+PVOID AddVectoredExceptionHandler(ULONG FirstHandler, PVECTORED_EXCEPTION_HANDLER VectoredHandler) {
+    PRINT(L"Called: AddVectoredExceptionHandler\n");
+    return NULL;
+}
+
+DWORD_PTR SetThreadAffinityMask(HANDLE hThread, DWORD_PTR dwThreadAffinityMask) {
+    PRINT(L"Called: SetThreadAffinityMask\n");
+    return 1;
+}
+
+DWORD ResumeThread(HANDLE hThread) {
+    PRINT(L"Called: ResumeThread\n");
+    return 1;
+}
+
+BOOL SetThreadPriority(HANDLE hThread, int nPriority) {
+    PRINT(L"Called: SetThreadPriority\n");
+    return TRUE;
+}
+
+void InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT(L"Called: InitializeCriticalSection\n");
+}
+
+void DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT(L"Called: DeleteCriticalSection\n");
+}
+
+void EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT(L"Called: EnterCriticalSection\n");
+}
+
+void LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT(L"Called: LeaveCriticalSection\n");
+}
+
+DWORD GetCurrentThreadId() {
+    PRINT(L"Called: GetCurrentThreadId\n");
+    return 1;
+}
+
+HANDLE CreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCTSTR lpName) {
+    PRINT(L"Called: CreateMutexA with name: lpName: %a\n", lpName);
+    return reinterpret_cast<HANDLE>(1);
+}
+
+BOOL ReleaseMutex(HANDLE hMutex) {
+    PRINT(L"Called: ReleaseMutex\n");
+    return TRUE;
+}
+
+HANDLE CreateSemaphoreA(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes, LONG lInitialCount, LONG lMaximumCount, LPCTSTR lpName) {
+    PRINT(L"Called: CreateSemaphoreA with name: lpName: %a\n", lpName);
+    return reinterpret_cast<HANDLE>(1);
+}
+
+BOOL ReleaseSemaphore(HANDLE hSemaphore, LONG lReleaseCount, LPLONG lpPreviousCount) {
+    PRINT(L"Called: ReleaseSemaphore\n");
+    if (lpPreviousCount) *lpPreviousCount = 0;
+    return TRUE;
+}
+
+BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode) {
+    PRINT(L"Called: TerminateProcess\n");
+    return TRUE;
+}
+
+HANDLE GetCurrentProcess() {
+    PRINT(L"Called: GetCurrentProcess\n");
+    return reinterpret_cast<HANDLE>(1);
+}
+
+LPTOP_LEVEL_EXCEPTION_FILTER UnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter) {
+    PRINT(L"Called: UnhandledExceptionFilter\n");
+    return NULL;
+}
+
+LPTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter) {
+    PRINT(L"Called: SetUnhandledExceptionFilter\n");
+    return NULL;
+}
+
+BOOL IsDebuggerPresent() {
+    PRINT(L"Called: IsDebuggerPresent\n");
+    return FALSE;
+}
+
+PVOID RtlVirtualUnwind(ULONG HandlerType, ULONG64 ImageBase, ULONG64 ControlPc, PRUNTIME_FUNCTION FunctionEntry, PCONTEXT ContextRecord, PVOID* HandlerData, PULONG64 EstablisherFrame, PCONTEXT ContextRecord2) {
+    PRINT(L"Called: RtlVirtualUnwind\n");
+    return NULL;
+}
+
+PRUNTIME_FUNCTION RtlLookupFunctionEntry(ULONG64 ControlPc, PULONG64 ImageBase, PVOID HistoryTable) {
+    PRINT(L"Called: RtlLookupFunctionEntry\n");
+    return NULL;
+}
+
+void RtlCaptureContext(PCONTEXT ContextRecord) {
+    PRINT(L"Called: RtlCaptureContext\n");
+}
+
+void RtlUnwindEx(PVOID TargetFrame, PVOID TargetIp, PVOID ExceptionRecord, PVOID ReturnValue, PCONTEXT ContextRecord, PVOID HistoryTable) {
+    PRINT(L"Called: RtlUnwindEx\n");
+}
+
+BOOL WriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped) {
+    PRINT(L"Called: WriteFile\n");
+    if (lpNumberOfBytesWritten) *lpNumberOfBytesWritten = 0;
+    return TRUE;
+}
+
+HMODULE GetModuleHandleW(LPCWSTR lpModuleName) {
+    PRINT(L"Called: GetModuleHandleW with name: %s\n", lpModuleName);
+    return NULL;
+}
+
+int SetHandleCount(int n) {
+    PRINT(L"Called: SetHandleCount\n");
+    return 0;
+}
+
+HANDLE GetStdHandle(DWORD nStdHandle) {
+    PRINT(L"Called: GetStdHandle\n");
+    return reinterpret_cast<HANDLE>(1);
+}
+
+DWORD GetFileType(HANDLE hFile) {
+    PRINT(L"Called: GetFileType\n");
+    return 0;
+}
+
+void GetStartupInfoA(LPSTARTUPINFOA lpStartupInfo) {
+    PRINT(L"Called: GetStartupInfoA\n");
+}
+
+LPCH GetEnvironmentStrings() {
+    PRINT(L"Called: GetEnvironmentStrings\n");
+    return NULL;
+}
+
+BOOL FreeEnvironmentStringsA(LPCH lpszString) {
+    PRINT(L"Called: FreeEnvironmentStringsA\n");
+    return TRUE;
+}
+
+LPWCH GetEnvironmentStringsW() {
+    PRINT(L"Called: GetEnvironmentStringsW\n");
+    return NULL;
+}
+
+BOOL FreeEnvironmentStringsW(LPWCH lpszString) {
+    PRINT(L"Called: FreeEnvironmentStringsW\n");
+    return TRUE;
+}
+
+void GetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime) {
+    PRINT(L"Called: GetSystemTimeAsFileTime\n");
+}
+
+int GetACP() {
+    PRINT(L"Called: GetACP\n");
+    return 0;
+}
+
+BOOL GetCPInfo(UINT CodePage, LPCPINFO lpCPInfo) {
+    PRINT(L"Called: GetCPInfo\n");
+    return FALSE;
+}
+
+UINT GetOEMCP() {
+    PRINT(L"Called: GetOEMCP\n");
+    return 0;
+}
+
+BOOL IsValidCodePage(UINT CodePage) {
+    PRINT(L"Called: IsValidCodePage\n");
+    return FALSE;
+}
+
+int WideCharToMultiByte(UINT CodePage, DWORD dwFlags, LPCWSTR lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, LPCSTR lpDefaultChar, LPBOOL lpUsedDefaultChar) {
+    PRINT(L"Called: WideCharToMultiByte\n");
+    if (lpWideCharStr == NULL || cchWideChar <= 0) {
+        return 0; // Return 0 for invalid input
+    }
+    
+    int convertedCount = 0;
+    while (*lpWideCharStr != '\0' && convertedCount < cchWideChar) {
+        *lpMultiByteStr = (char)*lpWideCharStr;
+        lpMultiByteStr++;
+        lpWideCharStr++;
+        convertedCount++;
+    }
+    
+    // Null-terminate the string if there is space
+    if (convertedCount < cchWideChar) {
+        *lpMultiByteStr = '\0';
+    }
+    
+    return convertedCount;
+}
+
+int LCMapStringA(LCID Locale, DWORD dwMapFlags, LPCSTR lpSrcStr, int cchSrc, LPSTR lpDestStr, int cchDest) {
+    PRINT(L"Called: LCMapStringA\n");
+    return 0;
+}
+
+int LCMapStringW(LCID Locale, DWORD dwMapFlags, LPCWSTR lpSrcStr, int cchSrc, LPWSTR lpDestStr, int cchDest) {
+    PRINT(L"Called: LCMapStringW\n");
+    return 0;
+}
+
+BOOL GetStringTypeA(LCID Locale, DWORD dwInfoType, LPCSTR lpSrcStr, int cchSrc, LPWORD lpCharType) {
+    PRINT(L"Called: GetStringTypeA\n");
+    return FALSE;
+}
+
+BOOL GetStringTypeW(DWORD dwInfoType, LPCWSTR lpSrcStr, int cchSrc, LPWORD lpCharType) {
+    PRINT(L"Called: GetStringTypeW\n");
+    return FALSE;
+}
+
+int GetLocaleInfoA(LCID Locale, LCTYPE LCType, LPSTR lpLCData, int cchData) {
+    PRINT(L"Called: GetLocaleInfoA\n");
+    *lpLCData = '\0';
+    return 1;
+}
+
+BOOL FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData) {
+    PRINT(L"Called: FlsSetValue\n");
+    return TRUE;
+}
+
+PSTR GetCommandLineA() {
+    PRINT(L"Called: GetCommandLineA\n");
+    return NULL;
+}
+
+LPVOID EncodePointer(LPVOID Ptr) {
+    PRINT(L"Called: EncodePointer\n");
+    return Ptr;
+}
+
+LPVOID DecodePointer(LPVOID Ptr) {
+    PRINT(L"Called: DecodePointer\n");
+    return Ptr;
+}
+
+BOOL FlsGetValue(DWORD dwFlsIndex) {
+    PRINT(L"Called: FlsGetValue\n");
+    return NULL;
+}
+
+BOOL FlsFree(DWORD dwFlsIndex) {
+    PRINT(L"Called: FlsFree\n");
+    return TRUE;
+}
+
+void SetLastError(DWORD dwErrCode) {
+    PRINT(L"Called: SetLastError\n");
+}
+
+DWORD FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback) {
+    PRINT(L"Called: FlsAlloc\n");
+    return 0;
+}
+
+BOOL HeapSetInformation(HANDLE HeapHandle, HEAP_INFORMATION_CLASS HeapInformationClass, PVOID HeapInformation, SIZE_T HeapInformationLength) {
+    PRINT(L"Called: HeapSetInformation\n");
+    return TRUE;
+}
+
+void GetSystemInfo(LPSYSTEM_INFO lpSystemInfo) {
+    PRINT(L"Called: GetSystemInfo\n");
+    if (lpSystemInfo) {
+        // Fill the struct with dummy values consistent with an x64 environment
+        lpSystemInfo->DUMMYUNIONNAME.DUMMYSTRUCTNAME.wProcessorArchitecture = 9; // PROCESSOR_ARCHITECTURE_AMD64
+        lpSystemInfo->dwPageSize = 0x1000; // 4 KB page size
+        lpSystemInfo->lpMinimumApplicationAddress = (LPVOID)0x10000;
+        lpSystemInfo->lpMaximumApplicationAddress = (LPVOID)0x7FFFFFFFFFFFFFFF;
+        lpSystemInfo->dwActiveProcessorMask = 1;
+        lpSystemInfo->dwNumberOfProcessors = 1;
+        lpSystemInfo->dwProcessorType = 8664; // PROCESSOR_AMD_X8664
+        lpSystemInfo->dwAllocationGranularity = 0x10000; // 64 KB
+        lpSystemInfo->wProcessorLevel = 6;
+        lpSystemInfo->wProcessorRevision = 0;
+    }
+}
+
+int MultiByteToWideChar(UINT CodePage, DWORD dwFlags, LPCSTR lpMultiByteStr, int cbMultiByte, LPWSTR lpWideCharStr, int cchWideChar) {
+    PRINT(L"Called: MultiByteToWideChar\n");
+    if (lpMultiByteStr == NULL || cchWideChar <= 0) {
+        return 0; // Return 0 for invalid input
+    }
+    
+    int convertedCount = 0;
+    while (*lpMultiByteStr != '\0' && convertedCount < cchWideChar) {
+        *lpWideCharStr = (wchar_t)*lpMultiByteStr;
+        lpMultiByteStr++;
+        lpWideCharStr++;
+        convertedCount++;
+    }
+    
+    // Null-terminate the string if there is space
+    if (convertedCount < cchWideChar) {
+        *lpWideCharStr = L'\0';
+    }
+    
+    return convertedCount;
+}
+
+extern int stricmp(const char *s1, const char *s2);
+
+void* ResolveKernel32(const char* functionName) {
+    if (stricmp(functionName, "HeapCreate") == 0) {
+        return HeapCreate;
+    } else if (stricmp(functionName, "HeapDestroy") == 0) {
+        return HeapDestroy;
+    } else if (stricmp(functionName, "HeapAlloc") == 0) {
+        return HeapAlloc;
+    } else if (stricmp(functionName, "HeapFree") == 0) {
+        return HeapFree;
+    } else if (stricmp(functionName, "HeapReAlloc") == 0) {
+        return HeapReAlloc;
+    } else if (stricmp(functionName, "HeapSize") == 0) {
+        return HeapSize;
+    } else if (stricmp(functionName, "GetCurrentThreadId") == 0) {
+        return GetCurrentThreadId;
+    } else if (stricmp(functionName, "GetCurrentThread") == 0) {
+        return GetCurrentThread;
+    } else if (stricmp(functionName, "CreateThread") == 0) {
+        return CreateThread;
+    } else if (stricmp(functionName, "WaitForSingleObject") == 0) {
+        return WaitForSingleObject;
+    } else if (stricmp(functionName, "CloseHandle") == 0) {
+        return CloseHandle;
+    } else if (stricmp(functionName, "QueryPerformanceCounter") == 0) {
+        return QueryPerformanceCounter;
+    } else if (stricmp(functionName, "QueryPerformanceFrequency") == 0) {
+        return QueryPerformanceFrequency;
+    } else if (stricmp(functionName, "GetTickCount") == 0) {
+        return GetTickCount;
+    } else if (stricmp(functionName, "GetModuleHandleA") == 0) {
+        return GetModuleHandleA;
+    } else if (stricmp(functionName, "GetProcAddress") == 0) {
+        return GetProcAddress;
+    } else if (stricmp(functionName, "LoadLibraryA") == 0) {
+        return LoadLibraryA;
+    } else if (stricmp(functionName, "GetCurrentProcessId") == 0) {
+        return GetCurrentProcessId;
+    } else if (stricmp(functionName, "GetCurrentProcess") == 0) {
+        return GetCurrentProcess;
+    } else if (stricmp(functionName, "ExitProcess") == 0) {
+        return ExitProcess;
+    } else if (stricmp(functionName, "InitializeCriticalSectionAndSpinCount") == 0) {
+        return InitializeCriticalSectionAndSpinCount;
+    } else if (stricmp(functionName, "GetSystemDirectoryA") == 0) {
+        return GetSystemDirectoryA;
+    } else if (stricmp(functionName, "GetWindowsDirectoryA") == 0) {
+        return GetWindowsDirectoryA;
+    } else if (stricmp(functionName, "GetModuleFileNameA") == 0) {
+        return GetModuleFileNameA;
+    } else if (stricmp(functionName, "Sleep") == 0) {
+        return Sleep;
+    } else if (stricmp(functionName, "SetErrorMode") == 0) {
+        return SetErrorMode;
+    } else if (stricmp(functionName, "GetEnvironmentVariableA") == 0) {
+        return GetEnvironmentVariableA;
+    } else if (stricmp(functionName, "CloseHandle") == 0) {
+        return CloseHandle;
+    } else if (stricmp(functionName, "GetLastError") == 0) {
+        return GetLastError;
+    } else if (stricmp(functionName, "GetFileSize") == 0) {
+        return GetFileSize;
+    } else if (stricmp(functionName, "CreateFileA") == 0) {
+        return CreateFileA;
+    } else if (stricmp(functionName, "ReadFile") == 0) {
+        return ReadFile;
+    } else if (stricmp(functionName, "SetFilePointer") == 0) {
+        return SetFilePointer;
+    } else if (stricmp(functionName, "FreeLibrary") == 0) {
+        return FreeLibrary;
+    } else if (stricmp(functionName, "GetThreadPriority") == 0) {
+        return GetThreadPriority;
+    } else if (stricmp(functionName, "RemoveVectoredExceptionHandler") == 0) {
+        return RemoveVectoredExceptionHandler;
+    } else if (stricmp(functionName, "RaiseException") == 0) {
+        return RaiseException;
+    } else if (stricmp(functionName, "AddVectoredExceptionHandler") == 0) {
+        return AddVectoredExceptionHandler;
+    } else if (stricmp(functionName, "SetThreadAffinityMask") == 0) {
+        return SetThreadAffinityMask;
+    } else if (stricmp(functionName, "ResumeThread") == 0) {
+        return ResumeThread;
+    } else if (stricmp(functionName, "SetThreadPriority") == 0) {
+        return SetThreadPriority;
+    } else if (stricmp(functionName, "InitializeCriticalSection") == 0) {
+        return InitializeCriticalSection;
+    } else if (stricmp(functionName, "DeleteCriticalSection") == 0) {
+        return DeleteCriticalSection;
+    } else if (stricmp(functionName, "EnterCriticalSection") == 0) {
+        return EnterCriticalSection;
+    } else if (stricmp(functionName, "LeaveCriticalSection") == 0) {
+        return LeaveCriticalSection;
+    } else if (stricmp(functionName, "GetCurrentThreadId") == 0) {
+        return GetCurrentThreadId;
+    } else if (stricmp(functionName, "CreateMutexA") == 0) {
+        return CreateMutexA;
+    } else if (stricmp(functionName, "ReleaseMutex") == 0) {
+        return ReleaseMutex;
+    } else if (stricmp(functionName, "CreateSemaphoreA") == 0) {
+        return CreateSemaphoreA;
+    } else if (stricmp(functionName, "ReleaseSemaphore") == 0) {
+        return ReleaseSemaphore;
+    } else if (stricmp(functionName, "TerminateProcess") == 0) {
+        return TerminateProcess;
+    } else if (stricmp(functionName, "GetCurrentProcess") == 0) {
+        return GetCurrentProcess;
+    } else if (stricmp(functionName, "UnhandledExceptionFilter") == 0) {
+        return UnhandledExceptionFilter;
+    } else if (stricmp(functionName, "SetUnhandledExceptionFilter") == 0) {
+        return SetUnhandledExceptionFilter;
+    } else if (stricmp(functionName, "IsDebuggerPresent") == 0) {
+        return IsDebuggerPresent;
+    } else if (stricmp(functionName, "RtlVirtualUnwind") == 0) {
+        return RtlVirtualUnwind;
+    } else if (stricmp(functionName, "RtlLookupFunctionEntry") == 0) {
+        return RtlLookupFunctionEntry;
+    } else if (stricmp(functionName, "RtlCaptureContext") == 0) {
+        return RtlCaptureContext;
+    } else if (stricmp(functionName, "RtlUnwindEx") == 0) {
+        return RtlUnwindEx;
+    } else if (stricmp(functionName, "WriteFile") == 0) {
+        return WriteFile;
+    } else if (stricmp(functionName, "GetModuleHandleW") == 0) {
+        return GetModuleHandleW;
+    } else if (stricmp(functionName, "SetHandleCount") == 0) {
+        return SetHandleCount;
+    } else if (stricmp(functionName, "GetStdHandle") == 0) {
+        return GetStdHandle;
+    } else if (stricmp(functionName, "GetFileType") == 0) {
+        return GetFileType;
+    } else if (stricmp(functionName, "GetStartupInfoA") == 0) {
+        return GetStartupInfoA;
+    } else if (stricmp(functionName, "GetEnvironmentStrings") == 0) {
+        return GetEnvironmentStrings;
+    } else if (stricmp(functionName, "FreeEnvironmentStringsA") == 0) {
+        return FreeEnvironmentStringsA;
+    } else if (stricmp(functionName, "GetEnvironmentStringsW") == 0) {
+        return GetEnvironmentStringsW;
+    } else if (stricmp(functionName, "FreeEnvironmentStringsW") == 0) {
+        return FreeEnvironmentStringsW;
+    } else if (stricmp(functionName, "GetSystemTimeAsFileTime") == 0) {
+        return GetSystemTimeAsFileTime;
+    } else if (stricmp(functionName, "GetACP") == 0) {
+        return GetACP;
+    } else if (stricmp(functionName, "GetCPInfo") == 0) {
+        return GetCPInfo;
+    } else if (stricmp(functionName, "GetOEMCP") == 0) {
+        return GetOEMCP;
+    } else if (stricmp(functionName, "IsValidCodePage") == 0) {
+        return IsValidCodePage;
+    } else if (stricmp(functionName, "WideCharToMultiByte") == 0) {
+        return WideCharToMultiByte;
+    } else if (stricmp(functionName, "LCMapStringA") == 0) {
+        return LCMapStringA;
+    } else if (stricmp(functionName, "LCMapStringW") == 0) {
+        return LCMapStringW;
+    } else if (stricmp(functionName, "GetStringTypeA") == 0) {
+        return GetStringTypeA;
+    } else if (stricmp(functionName, "GetStringTypeW") == 0) {
+        return GetStringTypeW;
+    } else if (stricmp(functionName, "GetLocaleInfoA") == 0) {
+        return GetLocaleInfoA;
+    } else if (stricmp(functionName, "FlsSetValue") == 0) {
+        return FlsSetValue;
+    } else if (stricmp(functionName, "GetCommandLineA") == 0) {
+        return GetCommandLineA;
+    } else if (stricmp(functionName, "EncodePointer") == 0) {
+        return EncodePointer;
+    } else if (stricmp(functionName, "DecodePointer") == 0) {
+        return DecodePointer;
+    } else if (stricmp(functionName, "FlsGetValue") == 0) {
+        return FlsGetValue;
+    } else if (stricmp(functionName, "FlsFree") == 0) {
+        return FlsFree;
+    } else if (stricmp(functionName, "SetLastError") == 0) {
+        return SetLastError;
+    } else if (stricmp(functionName, "FlsAlloc") == 0) {
+        return FlsAlloc;
+    } else if (stricmp(functionName, "GetSystemInfo") == 0) {
+        return GetSystemInfo;
+    } else if (stricmp(functionName, "HeapSetInformation") == 0) {
+        return HeapSetInformation;
+    } else if (stricmp(functionName, "MultiByteToWideChar") == 0) {
+        return MultiByteToWideChar;
+    }
+    
+    Print(L"Unknown function: %a\n", functionName);
+    return NULL;
 }
