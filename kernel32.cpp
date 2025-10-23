@@ -164,10 +164,12 @@ typedef DWORD LCID;
 typedef DWORD LCTYPE;
 #pragma endregion
 
+extern int stricmp(const char *s1, const char *s2);
+
 // --- Memory ---
 HANDLE HeapCreate(DWORD, SIZE_T, SIZE_T) {
     PRINT(L"Called: HeapCreate\n");
-    return nullptr;
+    return reinterpret_cast<HANDLE>(1);
 }
 
 BOOL HeapDestroy(HANDLE) {
@@ -272,13 +274,122 @@ HMODULE GetModuleHandleA(LPCSTR name) {
     return reinterpret_cast<HMODULE>(1);
 }
 
+void SleepConditionVariableCS(void*, void*, unsigned) {
+    PRINT(L"Called: SleepConditionVariableCS\n");
+}
+
+BOOL TryEnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT(L"Called: TryEnterCriticalSection\n");
+    return TRUE;
+}
+
+BOOL GetLogicalProcessorInformation(void*, void*) {
+    PRINT(L"Called: GetLogicalProcessorInformation\n");
+    return FALSE;
+}
+
+void InitializeConditionVariable(void* cond) {
+    PRINT(L"Called: InitializeConditionVariable\n");
+    // No-op stub
+}
+
+int timeBeginPeriod(UINT period) {
+    PRINT(L"Called: timeBeginPeriod\n");
+    return 0;
+}
+
+int timeEndPeriod(UINT period) {
+    PRINT(L"Called: timeEndPeriod\n");
+    return 0;
+}
+
+void WakeConditionVariable(void* cond) {
+    PRINT(L"Called: WakeConditionVariable\n");
+    // No-op stub
+}
+
+void WakeAllConditionVariable(void* cond) {
+    PRINT(L"Called: WakeAllConditionVariable\n");
+    // No-op stub
+}
+
+BOOL InitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection, DWORD dwSpinCount) {
+    PRINT(L"Called: InitializeCriticalSectionAndSpinCount\n");
+    return TRUE;
+}
+
+int waveOutOpen() { PRINT(L"Called: waveOutOpen\n"); return 0; }
+int waveOutPause() { PRINT(L"Called: waveOutPause\n"); return 0; }
+int waveOutPrepareHeader() { PRINT(L"Called: waveOutPrepareHeader\n"); return 0; }
+int waveOutUnprepareHeader() { PRINT(L"Called: waveOutUnprepareHeader\n"); return 0; }
+int waveOutWrite() { PRINT(L"Called: waveOutWrite\n"); return 0; }
+int waveOutReset() { PRINT(L"Called: waveOutReset\n"); return 0; }
+int waveOutClose() { PRINT(L"Called: waveOutClose\n"); return 0; }
+int waveOutRestart() { PRINT(L"Called: waveOutRestart\n"); return 0; }
+int waveOutSetVolume() { PRINT(L"Called: waveOutSetVolume\n"); return 0; }
+
 FARPROC GetProcAddress(HMODULE, LPCSTR func) {
-    PRINT(L"Called: GetProcAddress with string: %a\n", func);
+    PRINT(L"Called: GetProcAddress with func: %a\n", func);
+    if (stricmp(func, "waveOutOpen") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutOpen);
+    }
+    else if (stricmp(func, "waveOutPause") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutPause);
+    }
+    else if (stricmp(func, "waveOutPrepareHeader") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutPrepareHeader);
+    }
+    else if (stricmp(func, "waveOutUnprepareHeader") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutUnprepareHeader);
+    }
+    else if (stricmp(func, "waveOutWrite") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutWrite);
+    }
+    else if (stricmp(func, "waveOutReset") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutReset);
+    }
+    else if (stricmp(func, "waveOutClose") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutClose);
+    }
+    else if (stricmp(func, "waveOutRestart") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutRestart);
+    }
+    else if (stricmp(func, "waveOutSetVolume") == 0) {
+        return reinterpret_cast<FARPROC>(waveOutSetVolume);
+    }
+    else if (stricmp(func, "SleepConditionVariableCS") == 0) {
+        return reinterpret_cast<FARPROC>(SleepConditionVariableCS);
+    }
+    else if (stricmp(func, "TryEnterCriticalSection") == 0) {
+        return reinterpret_cast<FARPROC>(TryEnterCriticalSection);
+    }
+    else if (stricmp(func, "GetLogicalProcessorInformation") == 0) {
+        return reinterpret_cast<FARPROC>(GetLogicalProcessorInformation);
+    }
+    else if (stricmp(func, "InitializeConditionVariable") == 0) {
+        return reinterpret_cast<FARPROC>(InitializeConditionVariable);
+    }
+    else if (stricmp(func, "timeBeginPeriod") == 0) {
+        return reinterpret_cast<FARPROC>(timeBeginPeriod);
+    }
+    else if (stricmp(func, "timeEndPeriod") == 0) {
+        return reinterpret_cast<FARPROC>(timeEndPeriod);
+    }
+    else if (stricmp(func, "WakeConditionVariable") == 0) {
+        return reinterpret_cast<FARPROC>(WakeConditionVariable);
+    }
+    else if (stricmp(func, "InitializeCriticalSectionAndSpinCount") == 0) {
+        return reinterpret_cast<FARPROC>(InitializeCriticalSectionAndSpinCount);
+    }
+    else if (stricmp(func, "WakeAllConditionVariable") == 0) {
+        return reinterpret_cast<FARPROC>(WakeAllConditionVariable);
+    }
+    PRINT(L"Unknown function requested!\n");
     return nullptr;
 }
 
-HMODULE LoadLibraryA(LPCSTR) {
-    PRINT(L"Called: LoadLibraryA\n");
+HMODULE LoadLibraryA(LPCSTR name) {
+    PRINT(L"Called: LoadLibraryA with name: %a\n", name);
     return reinterpret_cast<HMODULE>(1);
 }
 
@@ -291,11 +402,6 @@ DWORD GetCurrentProcessId() {
 void ExitProcess(UINT uExitCode) {
     PRINT(L"Called: ExitProcess\n");
     while(1); // halt
-}
-
-BOOL InitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection, DWORD dwSpinCount) {
-    PRINT(L"Called: InitializeCriticalSectionAndSpinCount\n");
-    return TRUE;
 }
 
 DWORD GetSystemDirectoryA(LPSTR lpBuffer, DWORD uSize) {
@@ -703,8 +809,6 @@ int MultiByteToWideChar(UINT CodePage, DWORD dwFlags, LPCSTR lpMultiByteStr, int
     
     return convertedCount;
 }
-
-extern int stricmp(const char *s1, const char *s2);
 
 void* ResolveKernel32(const char* functionName) {
     if (stricmp(functionName, "HeapCreate") == 0) {

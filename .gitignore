@@ -1,0 +1,4 @@
+.vs/
+*.efi
+*.obj
+qemu.log

@@ -78,6 +78,65 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
 EFI_GRAPHICS_OUTPUT_BLT_PIXEL* framebuffer;
 EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* mode_info;
 
+#define SIMD_ALIGNMENT_BYTES 32
+#define ALIGN_MASK (~(SIMD_ALIGNMENT_BYTES - 1))
+#define ALIGN_CAST(ptr) ((UINTN)(ptr))
+
+void* Malloc(size_t size) {
+    PRINT(L"Malloc called with size: %u\n", size);
+
+    VOID    *OriginalPtr;
+    VOID    **AlignedPtrLoc;
+    UINTN   TotalSize;
+    UINTN   Addr;
+
+    // Calculate total size:
+    // 1. User requested size
+    // 2. Maximum space for alignment padding (SIMD_ALIGNMENT_BYTES - 1)
+    // 3. Space to store the original pointer for freeing (sizeof(VOID*))
+    TotalSize = size + SIMD_ALIGNMENT_BYTES - 1 + sizeof(VOID*);
+
+    // 1. Allocate a larger block of memory using the UEFI Pool service.
+    if (EFI_ERROR(gBS->AllocatePool(EfiLoaderData, TotalSize, &OriginalPtr))) {
+    return NULL; // Allocation failed
+    }
+
+    // 2. Calculate the aligned address.
+    // Start the alignment calculation *after* the space reserved for the original pointer.
+    Addr = ALIGN_CAST(OriginalPtr) + sizeof(VOID*);
+
+    // Align the address up to the nearest SIMD_ALIGNMENT_BYTES multiple:
+    // (Addr + Alignment - 1) & ~(Alignment - 1)
+    Addr = (Addr + SIMD_ALIGNMENT_BYTES - 1) & ALIGN_MASK;
+
+    // 3. Store the original pointer (OriginalPtr) immediately before the aligned address (Addr).
+    // The location is 8 bytes (sizeof(VOID*)) behind the start of the aligned block.
+    AlignedPtrLoc = (VOID**)(Addr - sizeof(VOID*));
+    *AlignedPtrLoc = OriginalPtr;
+
+    // 4. Return the aligned address to the caller.
+    return (VOID*)Addr;
+}
+
+void Free(void* ptr) {
+    PRINT(L"Free called with ptr: %p\n", ptr);
+
+    VOID **OriginalPtrLoc;
+    VOID *OriginalPtr;
+
+    if (ptr == NULL) {
+    return;
+    }
+
+    // 1. Calculate the address where the original pointer is stored.
+    // It is located sizeof(VOID*) bytes immediately before the AlignedPtr.
+    OriginalPtrLoc = (VOID**)(ALIGN_CAST(ptr) - sizeof(VOID*));
+    OriginalPtr    = *OriginalPtrLoc;
+
+    // 2. Use the UEFI Boot Service to free the original, unaligned block.
+    gBS->FreePool(OriginalPtr);
+}
+
 EFI_STATUS InitializeGop() {
     EFI_STATUS Status;
 
@@ -135,7 +194,7 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
         return NULL;
     }
 
-    VOID* file_buffer = AllocatePool(file_size);
+    VOID* file_buffer = Malloc(file_size);
     if (!file_buffer) { return NULL; }
 
     SetMem(file_buffer, file_size, 0);
@@ -148,13 +207,13 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
     if (EFI_ERROR(file_loading_status)) {
         Print(L"Failed to read file: %r\n", file_loading_status);
         // Free the allocated memory if the read fails
-        FreePool(file_buffer);
+        Free(file_buffer);
         return NULL;
     }
 
     if (read_size != file_size) {
         Print(L"Read size mismatch: expected %llu, got %llu\n", file_size, read_size);
-        FreePool(file_buffer);
+        Free(file_buffer);
         return NULL;
     }
 
@@ -339,7 +398,7 @@ void* LoadPeImage(void* buffer) {
 
     // Allocate memory for the full image
     uint64_t imageSize = pe->OptionalHeader.SizeOfImage;
-    uint64_t imageBase = (uint64_t)AllocatePool(imageSize);
+    uint64_t imageBase = (uint64_t)Malloc(imageSize);
     if (!imageBase) {
         Print(L"Failed to allocate image memory\n");
         return NULL;
@@ -453,7 +512,7 @@ bool LoadBinkDLL(EFI_FILE_HANDLE volume) {
     }
 
     void* binkBase = LoadPeImage(binkFileBuffer);
-    FreePool(binkFileBuffer); // Free the file buffer, as LoadPeImage copied it.
+    Free(binkFileBuffer); // Free the file buffer, as LoadPeImage copied it.
     if (!binkBase) {
         return false;
     }
@@ -613,31 +672,6 @@ EFI_STATUS SetMaxResolution(EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop) {
 
 extern "C" void enable_avx2();
 
-void* Malloc(size_t size) {
-    PRINT(L"Malloc called with size: %u\n", size);
-
-    void* addr = AllocatePool(size);
-    if (!addr) {
-        PRINT(L"Allocation failed!\n");
-        return NULL;
-    }
-
-    ZeroMem(addr, size);
-
-    return addr;
-}
-
-void Free(void* ptr) {
-    PRINT(L"Free called with ptr: %p\n", ptr);
-
-    if (!ptr) {
-        PRINT(L"Pointer is NULL, nothing to free!\n");
-        return;
-    }
-
-    FreePool(ptr);
-}
-
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     InitializeLib(ImageHandle, SystemTable);
     SystemTable->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
@@ -662,11 +696,9 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     Print(L"Bink function pointers initialized (propably)!\n");
 
-    pBinkSetSoundSystem(0, 0); // no sound
+    //pBinkSetSoundSystem(pBinkOpenWaveOut, 0);
     pBinkSetMemory((BINKMEMALLOC)Malloc, (BINKMEMFREE)Free); // debug allocators
     pBinkSetIO(0); // no io
-    //pBinkSetTimerRead() // r.i.p. my version of the sdk
-    // UPDATE: spoofed in kernel32.cpp
 
     Print(L"BinkSet* called\n");
 
@@ -675,19 +707,19 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     Print(L"Video file loaded into memory\n");
 
     HBINK bink = NULL;
-    bink = pBinkOpen((const char*)video_file, BINKFROMMEMORY);
+    bink = pBinkOpen((const char*)video_file, BINKFROMMEMORY | BINKNOSKIP | BINKNOTHREADEDIO);
     Print(L"Opened Bink!\n");
 
     int width = bink->Width, height = bink->Height;
     Print(L"Width: %d, Height: %d\n", width, height);
 
     // Allocate framebuffer
-    uint32_t* framebuffer = (uint32_t*)AllocatePool(width * height * sizeof(uint32_t));
+    uint32_t* framebuffer = (uint32_t*)Malloc(width * height * sizeof(uint32_t));
     if (!framebuffer) {
         Print(L"Failed to allocate framebuffer!\n");
         gBS->Stall(5 * 1000 * 1000);
         pBinkClose(bink);
-        FreePool(video_file);
+        Free(video_file);
         return 1;
     }
 
@@ -699,7 +731,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     while (true) {
         // Check if the video is done
         if (bink->FrameNum >= bink->Frames) {
-            Print(L"Video playback finished!\n");
+            Print(L"\nVideo playback finished!\n");
             break; // exit the loop if the video is done
         }
         
@@ -716,22 +748,18 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
             continue; // skip this frame
         }
 
-        // int code = pBinkDoFrame(bink);
-        // if (code != 0) {
-        //     Print(L"BinkDoFrame failed!\n");
-        //     pBinkClose(bink);
-        //     FreePool(video_file);
-        //     gBS->Stall(5 * 1000 * 1000);
-        //     gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
-        //     return 1;
-        // }
-        pBinkDoFrame(bink);
-        // no error handling? that's right!
-        // because it uses SEH internally and i don't have the will power to tackle that
-        // no SEH handling = #GP on throw, #GP on throw = no error handling, no error handling = no video
+        int code = pBinkDoFrame(bink);
+        if (code != 0) {
+            Print(L"BinkDoFrame failed!\n");
+            pBinkClose(bink);
+            Free(video_file);
+            gBS->Stall(5 * 1000 * 1000);
+            gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+            return 1;
+        }
 
         // Copy frame to our buffer
-        int code = pBinkCopyToBuffer(
+        code = pBinkCopyToBuffer(
             bink,
             framebuffer,
             width * 4,
@@ -743,7 +771,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         if (code != 0 && code != 1) {
             Print(L"BinkCopyToBuffer failed!\n");
             pBinkClose(bink);
-            FreePool(video_file);
+            Free(video_file);
             gBS->Stall(5 * 1000 * 1000);
             gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
             return 1;
@@ -756,14 +784,14 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         Print(L"\rframe %d done", bink->FrameNum);
     }
 
-    Print(L"\nSkipped frames: %u\n", skipped_frames);
+    Print(L"Skipped frames: %u\n", skipped_frames);
 
     pBinkClose(bink);
 
-    FreePool(video_file);
-    FreePool(framebuffer);
+    Free(video_file);
+    Free(framebuffer);
 
-    Print(L"Exiting\n");
+    Print(L"Exiting...\n");
     gBS->Stall(5 * 1000 * 1000);
     gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 
