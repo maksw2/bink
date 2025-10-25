@@ -165,6 +165,8 @@ typedef DWORD LCTYPE;
 #pragma endregion
 
 extern int stricmp(const char *s1, const char *s2);
+extern void* Malloc(size_t size);
+extern void Free(void* ptr);
 
 // --- Memory ---
 HANDLE HeapCreate(DWORD, SIZE_T, SIZE_T) {
@@ -179,24 +181,24 @@ BOOL HeapDestroy(HANDLE) {
 
 LPVOID HeapAlloc(HANDLE, DWORD, SIZE_T size) {
     PRINT(L"Called: HeapAlloc with size: %ull\n", size);
-    return AllocatePool(size);
+    return Malloc(size);
 }
 
 BOOL HeapFree(HANDLE, DWORD, LPVOID ptr) {
     PRINT(L"Called: HeapFree with ptr: %p\n", ptr);
     if (ptr)
-        FreePool(ptr);
+        Free(ptr);
     return TRUE;
 }
 
 LPVOID HeapReAlloc(HANDLE, DWORD, LPVOID ptr, SIZE_T size) {
     PRINT(L"Called: HeapReAlloc with size: %ull and ptr: %p\n", size, ptr);
-    if (!ptr) return AllocatePool(size);
-    LPVOID newPtr = AllocatePool(size);
+    if (!ptr) return Malloc(size);
+    LPVOID newPtr = Malloc(size);
     if (!newPtr) return nullptr;
     // No original size info; can't fully emulate, user must handle
     CopyMem(newPtr, ptr, size);
-    FreePool(ptr);
+    Free(ptr);
     return newPtr;
 }
 

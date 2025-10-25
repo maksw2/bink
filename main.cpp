@@ -1,8 +1,6 @@
 #include <efi.h>
 #include <efilib.h>
 #include <x86_64\pe.h>
-#define malloc AllocatePool
-#define free FreePool
 #include <immintrin.h>
 #include <compiler_defines.h>
 #include "bink.h"
@@ -78,63 +76,127 @@ EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
 EFI_GRAPHICS_OUTPUT_BLT_PIXEL* framebuffer;
 EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* mode_info;
 
-#define SIMD_ALIGNMENT_BYTES 32
-#define ALIGN_MASK (~(SIMD_ALIGNMENT_BYTES - 1))
-#define ALIGN_CAST(ptr) ((UINTN)(ptr))
+struct BlockHeader {
+    uint32_t magic;
+    size_t size;
+    bool free;
+    BlockHeader* next;
+};
 
-void* Malloc(size_t size) {
-    PRINT(L"Malloc called with size: %u\n", size);
+constexpr uint32_t MAGIC_ALLOCATED = 0xCAFEBABE;
+constexpr uint32_t MAGIC_FREED = 0xDEADBEEF;
 
-    VOID    *OriginalPtr;
-    VOID    **AlignedPtrLoc;
-    UINTN   TotalSize;
-    UINTN   Addr;
+static void* g_memoryPool = 0;
+static size_t g_poolSize = 0;
+static struct BlockHeader* g_freeList = 0;
 
-    // Calculate total size:
-    // 1. User requested size
-    // 2. Maximum space for alignment padding (SIMD_ALIGNMENT_BYTES - 1)
-    // 3. Space to store the original pointer for freeing (sizeof(VOID*))
-    TotalSize = size + SIMD_ALIGNMENT_BYTES - 1 + sizeof(VOID*);
+#define AVX_ALIGN 32
+#define ALIGN_UP(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
 
-    // 1. Allocate a larger block of memory using the UEFI Pool service.
-    if (EFI_ERROR(gBS->AllocatePool(EfiLoaderData, TotalSize, &OriginalPtr))) {
-    return NULL; // Allocation failed
+void InitAllocatorFromBuffer(void* buffer, size_t size) {
+    PRINT(L"Initializing custom allocator with buffer %p of size %ull\n", buffer, size);
+    if (!buffer || size <= sizeof(struct BlockHeader)) {
+        Print(L"Invalid buffer or size for allocator initialization\n");
+        gBS->Stall(5 * 1000000); // 5 seconds
+        gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
     }
 
-    // 2. Calculate the aligned address.
-    // Start the alignment calculation *after* the space reserved for the original pointer.
-    Addr = ALIGN_CAST(OriginalPtr) + sizeof(VOID*);
+    g_memoryPool = buffer;
+    g_poolSize = size;
 
-    // Align the address up to the nearest SIMD_ALIGNMENT_BYTES multiple:
-    // (Addr + Alignment - 1) & ~(Alignment - 1)
-    Addr = (Addr + SIMD_ALIGNMENT_BYTES - 1) & ALIGN_MASK;
+    g_freeList = (struct BlockHeader*)buffer;
+    g_freeList->magic = MAGIC_ALLOCATED;
+    g_freeList->size = size - sizeof(struct BlockHeader);
+    g_freeList->free = true;
+    g_freeList->next = 0;
+}
 
-    // 3. Store the original pointer (OriginalPtr) immediately before the aligned address (Addr).
-    // The location is 8 bytes (sizeof(VOID*)) behind the start of the aligned block.
-    AlignedPtrLoc = (VOID**)(Addr - sizeof(VOID*));
-    *AlignedPtrLoc = OriginalPtr;
+static bool IsPointerInPool(void* ptr) {
+    return ptr >= g_memoryPool &&
+        ptr < (void*)((uint8_t*)g_memoryPool + g_poolSize);
+}
 
-    // 4. Return the aligned address to the caller.
-    return (VOID*)Addr;
+void* Malloc(size_t size) {
+    PRINT(L"Allocating memory of size %ull\n", size);
+    size = ALIGN_UP(size, AVX_ALIGN);  // ensure AVX alignment
+    struct BlockHeader* best = 0;
+    struct BlockHeader* bestPrev = 0;
+    struct BlockHeader* prev = 0;
+    struct BlockHeader* current = g_freeList;
+
+    while (current) {
+        if (current->free && current->size >= size) {
+            if (!best || current->size < best->size) {
+                best = current;
+                bestPrev = prev;
+            }
+        }
+        prev = current;
+        current = current->next;
+    }
+
+    if (!best) {
+        return 0;
+    }
+
+    uintptr_t payloadAddr = (uintptr_t)(best + 1);
+    uintptr_t alignedAddr = ALIGN_UP(payloadAddr, AVX_ALIGN);
+    size_t padding = alignedAddr - payloadAddr;
+
+    size_t totalNeeded = size + padding;
+    if (best->size < totalNeeded) {
+        return 0; // not enough space
+    }
+
+    size_t remaining = best->size - totalNeeded;
+
+    if (remaining > sizeof(struct BlockHeader)) {
+        struct BlockHeader* newBlock = (struct BlockHeader*)((uint8_t*)(best + 1) + totalNeeded);
+        newBlock->magic = MAGIC_ALLOCATED;
+        newBlock->size = remaining - sizeof(struct BlockHeader);
+        newBlock->free = true;
+        newBlock->next = best->next;
+        best->next = newBlock;
+    }
+
+    best->magic = MAGIC_ALLOCATED;
+    best->free = false;
+    best->size = totalNeeded;
+
+    return (void*)alignedAddr;
 }
 
 void Free(void* ptr) {
-    PRINT(L"Free called with ptr: %p\n", ptr);
+    PRINT(L"Freeing memory at %p\n", ptr);
+    if (!ptr || !IsPointerInPool(ptr)) return;
 
-    VOID **OriginalPtrLoc;
-    VOID *OriginalPtr;
+    struct BlockHeader* block = (struct BlockHeader*)((uint8_t*)ptr - sizeof(struct BlockHeader));
 
-    if (ptr == NULL) {
-    return;
+    while (block->magic != MAGIC_ALLOCATED && (uint8_t*)block > (uint8_t*)g_memoryPool) {
+        block = (struct BlockHeader*)((uint8_t*)block - 1);  // backtrack if pointer was aligned forward
     }
 
-    // 1. Calculate the address where the original pointer is stored.
-    // It is located sizeof(VOID*) bytes immediately before the AlignedPtr.
-    OriginalPtrLoc = (VOID**)(ALIGN_CAST(ptr) - sizeof(VOID*));
-    OriginalPtr    = *OriginalPtrLoc;
+    if (!IsPointerInPool(block) || block->magic != MAGIC_ALLOCATED) {
+        Print(L"Invalid pointer passed to Free: %p\n", ptr);
+        return;
+    }
 
-    // 2. Use the UEFI Boot Service to free the original, unaligned block.
-    gBS->FreePool(OriginalPtr);
+    block->magic = MAGIC_FREED;
+    block->free = true;
+
+    // Coalesce
+    struct BlockHeader* current = g_freeList;
+    while (current) {
+        if (current->free) {
+            struct BlockHeader* next = current->next;
+            while (next && next->free) {
+                current->size += sizeof(struct BlockHeader) + next->size;
+                current->next = next->next;
+                next = next->next;
+            }
+        }
+        current = current->next;
+    }
 }
 
 EFI_STATUS InitializeGop() {
@@ -584,7 +646,7 @@ bool LoadBinkDLL(EFI_FILE_HANDLE volume) {
 }
 #pragma endregion
 
-void Blit1280x720_AVX2_NT(
+void Blit_AVX2_NT(
     EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop,
     uint32_t *src, 
     UINTN src_width, UINTN src_height
@@ -676,6 +738,27 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     InitializeLib(ImageHandle, SystemTable);
     SystemTable->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
     Print(L"Hello, World!\n");
+
+    VOID* HeapMemory = NULL;
+    UINTN AllocationSize = 512 * 1024 * 1024; // 512 MB
+    UINTN Pages = AllocationSize / 4096;      // UEFI page size is 4KB
+
+    EFI_STATUS Status = gBS->AllocatePages(
+        AllocateAnyPages,
+        EfiLoaderData,
+        Pages,
+        (EFI_PHYSICAL_ADDRESS*)&HeapMemory
+    );
+
+    if (EFI_ERROR(Status)) {
+        Print(L"Failed to allocate memory pool pages: %r\n", Status);
+        gBS->Stall(5 * 1000 * 1000);
+        gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+        return Status;
+    }
+
+    InitAllocatorFromBuffer(HeapMemory, AllocationSize);
+    Print(L"Custom allocator initialized\n");
 
     InitializeGop();
     Print(L"GOP initialized\n");
@@ -779,7 +862,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         
         pBinkNextFrame(bink);
 
-        Blit1280x720_AVX2_NT(gop, framebuffer, width, height);
+        Blit_AVX2_NT(gop, framebuffer, width, height);
 
         Print(L"\rframe %d done", bink->FrameNum);
     }
