@@ -809,9 +809,26 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     Print(L"Framebuffer allocated!\n");
 
     size_t skipped_frames = 0;
+    EFI_INPUT_KEY key;
+    bool paused = false;
 
     // start the decode loop
     while (true) {
+        EFI_STATUS key_status = gST->ConIn->ReadKeyStroke(gST->ConIn, &key);
+        if (key_status == EFI_SUCCESS) {
+            if (key.UnicodeChar == 'q') {
+                Print(L"\nExiting");
+                break;
+            }
+            else if (key.UnicodeChar == 'r') {
+                pBinkGoto(bink, 1, 0);
+            }
+            else if (key.UnicodeChar == 'p') {
+                pBinkPause(bink, paused);
+                paused = !paused;
+            }
+        }
+
         // Check if the video is done
         if (bink->FrameNum >= bink->Frames) {
             Print(L"\nVideo playback finished!\n");
@@ -864,10 +881,12 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
         Blit_AVX2_NT(gop, framebuffer, width, height);
 
-        Print(L"\rframe %d done", bink->FrameNum);
+        Print(L"\rframe %d done    ", bink->FrameNum); // oh yeah it can go down now so we have to account for that
     }
 
-    Print(L"Skipped frames: %u\n", skipped_frames);
+    Print(L"\nSkipped frames: %u\n", skipped_frames);
+    if (skipped_frames < 10)
+        Print(L"That's pretty damn good!\n");
 
     pBinkClose(bink);
 
@@ -875,7 +894,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     Free(framebuffer);
 
     Print(L"Exiting...\n");
-    gBS->Stall(5 * 1000 * 1000);
+    gBS->Stall(4 * 1000 * 1000);
     gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 
     return 0;
