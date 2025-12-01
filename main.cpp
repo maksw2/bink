@@ -117,7 +117,7 @@ static bool IsPointerInPool(void* ptr) {
 }
 
 void* Malloc(size_t size) {
-    PRINT(L"Allocating memory of size %ull\n", size);
+    PRINT(L"Allocating memory of size %llu, ptr = ", size);
     size = ALIGN_UP(size, AVX_ALIGN);  // ensure AVX alignment
     struct BlockHeader* best = 0;
     struct BlockHeader* bestPrev = 0;
@@ -136,6 +136,7 @@ void* Malloc(size_t size) {
     }
 
     if (!best) {
+        PRINT(L"NULL\n");
         return 0;
     }
 
@@ -145,6 +146,7 @@ void* Malloc(size_t size) {
 
     size_t totalNeeded = size + padding;
     if (best->size < totalNeeded) {
+        PRINT(L"NULL not enough space\n");
         return 0; // not enough space
     }
 
@@ -163,6 +165,7 @@ void* Malloc(size_t size) {
     best->free = false;
     best->size = totalNeeded;
 
+    PRINT(L"%p\n", (void*)alignedAddr);
     return (void*)alignedAddr;
 }
 
