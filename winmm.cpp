@@ -9,7 +9,6 @@ typedef DWORD (*timeGetTime_t)();
 timeGetTime_t ptimeGetTime = nullptr;
 
 DWORD timeGetTime() {
-    PRINT(L"timeGetTime called\n");
     EFI_TIME t;
     if (EFI_SUCCESS == gRT->GetTime(&t, nullptr)) {
         // convert to milliseconds since midnight

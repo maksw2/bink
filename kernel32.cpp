@@ -224,43 +224,58 @@ DWORD WaitForSingleObject(HANDLE, DWORD) {
 }
 
 // --- Timing ---
-static unsigned long long tsc_freq = 0;
-
-static void init_tsc_freq() {
-    int cpuInfo[4] = {0};
-    __cpuid(cpuInfo, 0x15);
-
-    if (cpuInfo[0] && cpuInfo[1]) {
-        // leaf 0x15 gives: eax = denom, ebx = numer, ecx = crystal Hz
-        unsigned eax = cpuInfo[0]; // denom
-        unsigned ebx = cpuInfo[1]; // numer
-        unsigned ecx = cpuInfo[2]; // crystal freq Hz
-
-        if (ecx != 0) {
-            tsc_freq = (unsigned long long)ecx * ebx / eax;
-            return;
-        }
-    }
-
-    // fallback: CPUID 0x16 (nominal core frequency MHz)
-    __cpuid(cpuInfo, 0x16);
-    if (cpuInfo[0]) {
-        tsc_freq = (unsigned long long)cpuInfo[0] * 1000000ULL;
-    }
+static inline unsigned long long read_tsc() {
+    _mm_lfence();
+    return __rdtsc();
 }
 
-BOOL QueryPerformanceCounter(LARGE_INTEGER *li) {
-    if (!tsc_freq) init_tsc_freq();
-    unsigned long long tsc = __rdtsc();
-    // convert to microseconds
-    li->QuadPart = (tsc * 1000000ULL) / tsc_freq;
+BOOL g_QpcInitialized = FALSE;
+LARGE_INTEGER g_QpcFrequency;
+
+static constexpr unsigned long long MS_PER_SECOND = 1000;
+
+static unsigned long long g_TicksPerMs = 0;
+
+BOOL QueryPerformanceFrequency(LARGE_INTEGER* lpFrequency)
+{
+    if (!lpFrequency)
+        return FALSE;
+
+    if (g_QpcInitialized)
+    {
+        *lpFrequency = g_QpcFrequency;
+        return TRUE;
+    }
+
+    // 1. Calibrate for 1 full second to get accurate Ticks Per Second
+    // gBS->Stall takes microseconds (1,000,000 us = 1 second)
+    unsigned long long tscStart = read_tsc();
+    gBS->Stall(1000000); 
+    unsigned long long tscEnd = read_tsc();
+
+    unsigned long long ticksPerSecond = tscEnd - tscStart;
+
+    // 2. Set the "TicksPerMs" for our Counter to use later
+    g_TicksPerMs = ticksPerSecond / MS_PER_SECOND;
+
+    // 3. Set Frequency to 1000. 
+    // This tells the engine: "One unit in QPC equals 1/1000th of a second (1ms)"
+    g_QpcFrequency.QuadPart = MS_PER_SECOND;
+
+    *lpFrequency = g_QpcFrequency;
+    g_QpcInitialized = TRUE;
     return TRUE;
 }
 
-BOOL QueryPerformanceFrequency(LARGE_INTEGER *li) {
-    if (!tsc_freq) init_tsc_freq();
-    // frequency in Hz (ticks per second)
-    li->QuadPart = 1000000ULL; // since we convert to µs above
+BOOL QueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)
+{
+    if (!lpPerformanceCount || g_TicksPerMs == 0)
+        return FALSE;
+
+    // Now QPC returns the number of milliseconds that have passed.
+    // Because Frequency is 1000, 1000 "counts" = 1 second. Perfectly synced.
+    lpPerformanceCount->QuadPart = read_tsc() / g_TicksPerMs;
+    
     return TRUE;
 }
 
