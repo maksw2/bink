@@ -1,9 +1,32 @@
 #include <efi.h>
 #include <efilib.h>
+#include <intrin.h>
 #include <immintrin.h>
 #include <compiler_defines.h>
 #include "print.h"
 #include "take_care_of_bink.h"
+
+int SerialPutc(char c) {
+    // Define a timeout limit to prevent infinite hanging
+    uint32_t timeout = 1000000; 
+
+    // 0x3FD is the Line Status Register (LSR)
+    // 0x20 is the Transmit Holding Register Empty (THRE) bit
+    while (!(__inbyte(0x3FD) & 0x20)) {
+        if (--timeout == 0) {
+            return 0; // Hardware failure or busy timeout
+        }
+    }
+
+    // 0x3F8 is the Transmit Holding Register (THR)
+    __outbyte(0x3F8, (unsigned char)c);
+    
+    return 1;
+}
+
+void _putchar(char c) {
+    SerialPutc(c);
+}
 
 EFI_GRAPHICS_OUTPUT_PROTOCOL* gop;
 EFI_GRAPHICS_OUTPUT_MODE_INFORMATION* mode_info;
@@ -14,7 +37,7 @@ EFI_STATUS InitializeGop() {
     // 1. Locate the Graphics Output Protocol
     Status = LibLocateProtocol(&gEfiGraphicsOutputProtocolGuid, (VOID**)&gop);
     if (EFI_ERROR(Status)) {
-        Print(L"Failed to locate Graphics Output Protocol: %r\n", Status);
+        printf("Failed to locate Graphics Output Protocol: %r\n", Status);
         return Status;
     }
 
@@ -53,7 +76,7 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
     EFI_STATUS file_loading_status = volume->Open(volume, &file, (wchar_t*)filename,
         EFI_FILE_MODE_READ, 0);
     if (EFI_ERROR(file_loading_status)) {
-        Print(L"Failed to open file: %r\n", file_loading_status);
+        printf("Failed to open file: %r\n", file_loading_status);
         return NULL;
     }
 
@@ -75,14 +98,14 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
     file->Close(file);
 
     if (EFI_ERROR(file_loading_status)) {
-        Print(L"Failed to read file: %r\n", file_loading_status);
+        printf("Failed to read file: %r\n", file_loading_status);
         // Free the allocated memory if the read fails
         Free(file_buffer);
         return NULL;
     }
 
     if (read_size != file_size) {
-        Print(L"Read size mismatch: expected %llu, got %llu\n", file_size, read_size);
+        printf("Read size mismatch: expected %llu, got %llu\n", file_size, read_size);
         Free(file_buffer);
         return NULL;
     }
@@ -104,7 +127,7 @@ bool LoadBinkDLL(EFI_FILE_HANDLE volume) {
 
     // Grab exports
     #define GRAB(name) p##name = (name##_t)GetExportByName(binkBase, #name); \
-                       if (!p##name) { Print(L"Missing export: %a\n", #name); return false; }
+                       if (!p##name) { printf("Missing export: %s\n", #name); return false; }
 
     GRAB(BinkLogoAddress)
     GRAB(BinkSetError)
@@ -235,19 +258,19 @@ EFI_STATUS SetMaxResolution(EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop) {
     }
 
     if (MaxModeInfo) {
-        Print(L"Found max resolution mode: %u x %u at mode %u\n",
+        printf("Found max resolution mode: %u x %u at mode %u\n",
               MaxModeInfo->HorizontalResolution, MaxModeInfo->VerticalResolution, MaxModeNumber);
         
         // Set the mode to the maximum resolution
         Status = Gop->SetMode(Gop, MaxModeNumber);
         if (EFI_ERROR(Status)) {
-            Print(L"Failed to set mode: %r\n", Status);
+            printf("Failed to set mode: %r\n", Status);
         } else {
-            Print(L"Successfully set max resolution mode.\n");
+            printf("Successfully set max resolution mode.\n");
         }
         FreePool(MaxModeInfo); // Free the memory for MaxModeInfo
     } else {
-        Print(L"Could not find a valid mode.\n");
+        printf("Could not find a valid mode.\n");
         Status = EFI_NOT_FOUND;
     }
     
@@ -256,10 +279,93 @@ EFI_STATUS SetMaxResolution(EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop) {
 
 extern "C" void enable_avx2();
 
+#pragma pack(push, 1)
+typedef struct {
+    uint16_t type;
+    uint32_t size;
+    uint16_t reserved1;
+    uint16_t reserved2;
+    uint32_t offset;
+    uint32_t dib_size;
+    int32_t  width;
+    int32_t  height;
+    uint16_t planes;
+    uint16_t bpp;
+    uint32_t compression;
+    uint32_t image_size;
+    int32_t  x_ppm;
+    int32_t  y_ppm;
+    uint32_t colors;
+    uint32_t important_colors;
+} BMP_HEADER;
+#pragma pack(pop)
+
+void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Gop) {
+    UINT32 width = Gop->Mode->Info->HorizontalResolution;
+    UINT32 height = Gop->Mode->Info->VerticalResolution;
+    UINT32 stride = Gop->Mode->Info->PixelsPerScanLine;
+    uint32_t* fb_base = (uint32_t*)Gop->Mode->FrameBufferBase;
+
+    // 1. Allocate a single contiguous buffer for the BMP (Header + Pixels)
+    UINTN total_pixel_bytes = width * height * 4;
+    UINTN total_file_size = sizeof(BMP_HEADER) + total_pixel_bytes;
+    uint8_t* file_buffer = (uint8_t*)AllocatePool(total_file_size);
+    
+    if (!file_buffer) {
+        printf("Failed to allocate memory for screenshot!\n");
+        return;
+    }
+
+    // 2. Setup Header
+    BMP_HEADER* header = (BMP_HEADER*)file_buffer;
+    SetMem(header, sizeof(BMP_HEADER), 0);
+    header->type = 0x4D42;
+    header->offset = sizeof(BMP_HEADER);
+    header->size = (uint32_t)total_file_size;
+    header->dib_size = 40;
+    header->width = (int32_t)width;
+    header->height = -(int32_t)height; // Top-down
+    header->planes = 1;
+    header->bpp = 32;
+
+    // 3. Copy pixels to buffer while stripping Stride and fixing Alpha
+    uint32_t* dst_pixels = (uint32_t*)(file_buffer + sizeof(BMP_HEADER));
+    __m256i alpha_mask = _mm256_set1_epi32(0xFF000000); // Mask to force Alpha to 255
+
+    for (UINT32 y = 0; y < height; y++) {
+        uint32_t* src_row = fb_base + (y * stride);
+        uint32_t* dst_row = dst_pixels + (y * width);
+
+        UINT32 x = 0;
+        // AVX2 Loop: Fix 8 pixels at a time
+        for (; x + 7 < width; x += 8) {
+            __m256i pixels = _mm256_loadu_si256((__m256i*)(src_row + x));
+            pixels = _mm256_or_si256(pixels, alpha_mask); // Force Alpha channel to Opaque
+            _mm256_storeu_si256((__m256i*)(dst_row + x), pixels);
+        }
+        // Cleanup loop for remaining pixels
+        for (; x < width; x++) {
+            dst_row[x] = src_row[x] | 0xFF000000;
+        }
+    }
+
+    // 4. One single disk write (Massively faster)
+    EFI_FILE_HANDLE file;
+    EFI_STATUS status = volume->Open(volume, &file, (CHAR16*)L"screen.bmp", 
+                                     EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
+    if (!EFI_ERROR(status)) {
+        UINTN write_size = total_file_size;
+        file->Write(file, &write_size, file_buffer);
+        file->Close(file);
+    }
+
+    FreePool(file_buffer);
+}
+
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     InitializeLib(ImageHandle, SystemTable);
     SystemTable->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
-    Print(L"Hello, World!\n");
+    printf("Hello, World!\n");
 
     VOID* HeapMemory = NULL;
     UINTN AllocationSize = 512 * 1024 * 1024; // 512 MB
@@ -273,72 +379,73 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     );
 
     if (EFI_ERROR(Status)) {
-        Print(L"Failed to allocate memory pool pages: %r\n", Status);
+        printf("Failed to allocate memory pool pages: %r\n", Status);
         gBS->Stall(5 * 1000 * 1000);
         gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
         return Status;
     }
 
     InitAllocatorFromBuffer(HeapMemory, AllocationSize);
-    Print(L"Custom allocator initialized\n");
+    printf("Custom allocator initialized\n");
 
     InitializeGop();
-    Print(L"GOP initialized\n");
+    printf("GOP initialized\n");
 
     SetMaxResolution(gop);
 
     enable_avx2();
 
     EFI_FILE_HANDLE volume = GetVolume(ImageHandle);
-    Print(L"Got volume\n");
+    printf("Got volume\n");
 
     if (!LoadBinkDLL(volume)) {
-        Print(L"Failed to load Bink Video DLL\n");
+        printf("Failed to load Bink Video DLL\n");
         gBS->Stall(5 * 1000 * 1000);
         gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
         return 1;
     }
 
-    Print(L"Bink function pointers initialized!\n");
+    printf("Bink function pointers initialized!\n");
 
     //pBinkSetSoundSystem(pBinkOpenWaveOut, 0);
     pBinkSetMemory((BINKMEMALLOC)Malloc, (BINKMEMFREE)Free);
     pBinkSetIO(0); // no io
 
-    Print(L"BinkSet* called\n");
+    printf("BinkSet* called\n");
 
     void* video_file = LoadFile(volume, L"idk.bk2");
 
-    Print(L"Video file loaded into memory\n");
+    printf("Video file loaded into memory\n");
 
     HBINK bink = NULL;
     bink = pBinkOpen((const char*)video_file, BINKFROMMEMORY | BINKNOSKIP | BINKNOTHREADEDIO);
-    Print(L"Opened Bink!\n");
+    printf("Opened Bink!\n");
 
     int width = bink->Width, height = bink->Height;
-    Print(L"Width: %d, Height: %d\n", width, height);
+    printf("Width: %d, Height: %d\n", width, height);
 
     // Allocate framebuffer
     uint32_t* framebuffer = (uint32_t*)Malloc(width * height * sizeof(uint32_t));
     if (!framebuffer) {
-        Print(L"Failed to allocate framebuffer!\n");
+        printf("Failed to allocate framebuffer!\n");
         gBS->Stall(5 * 1000 * 1000);
         pBinkClose(bink);
         Free(video_file);
         return 1;
     }
 
-    Print(L"Framebuffer allocated!\n");
+    printf("Framebuffer allocated!\n");
 
     EFI_INPUT_KEY key;
     bool paused = false;
+    uint64_t skipped = 0;
 
     // start the decode loop
     while (true) {
         EFI_STATUS key_status = gST->ConIn->ReadKeyStroke(gST->ConIn, &key);
         if (key_status == EFI_SUCCESS) {
             if (key.UnicodeChar == 'q') {
-                Print(L"\nExiting");
+                printf("\nExiting");
                 break;
             }
             else if (key.UnicodeChar == 'r') {
@@ -348,11 +455,14 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
                 pBinkPause(bink, paused);
                 paused = !paused;
             }
+            else if (key.UnicodeChar == 's' ) {
+                SavePhysicalScreen(volume, gop);
+            }
         }
 
         // Check if the video is done
         if (bink->FrameNum >= bink->Frames) {
-            Print(L"\nVideo playback finished!\n");
+            printf("\nVideo playback finished!");
             break; // exit the loop if the video is done
         }
         
@@ -365,12 +475,13 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         // Check if we should skip the frame
         if (pBinkShouldSkip(bink)) {
             pBinkNextFrame(bink);
+            skipped++;
             continue; // skip this frame
         }
 
         int code = pBinkDoFrame(bink);
         if (code != 0) {
-            Print(L"BinkDoFrame failed!\n");
+            printf("BinkDoFrame failed!\n");
             pBinkClose(bink);
             Free(video_file);
             gBS->Stall(5 * 1000 * 1000);
@@ -389,7 +500,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
             BINKSURFACE32 | BINKCOPYALL
         );
         if (code != 0 && code != 1) { // who knows what they mean
-            Print(L"BinkCopyToBuffer failed!\n");
+            printf("BinkCopyToBuffer failed!\n");
             pBinkClose(bink);
             Free(video_file);
             gBS->Stall(5 * 1000 * 1000);
@@ -402,16 +513,20 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         Blit_AVX2_NT(gop, framebuffer, width, height);
 
         if (bink->FrameNum % 10 == 0)
-            Print(L"\rframe %d done    ", bink->FrameNum);
+            printf("\rframe %d done    ", bink->FrameNum);
     }
+
+    printf("\nTotal skipped frames: %llu\n", skipped);
+    if (skipped > 100)
+        printf("oof\n");
 
     pBinkClose(bink);
 
     Free(video_file);
     Free(framebuffer);
 
-    Print(L"Exiting...\n");
-    gBS->Stall(4 * 1000 * 1000);
+    printf("Exiting...\n");
+    gBS->Stall(2 * 1000 * 1000);
     gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 
     return 0;

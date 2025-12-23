@@ -22,9 +22,9 @@ static struct BlockHeader* g_freeList = 0;
 #define ALIGN_UP(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
 
 void InitAllocatorFromBuffer(void* buffer, size_t size) {
-    PRINT(L"Initializing custom allocator with buffer %p of size %ull\n", buffer, size);
+    printf("Initializing custom allocator with buffer %p of size %ull\n", buffer, size);
     if (!buffer || size <= sizeof(struct BlockHeader)) {
-        Print(L"Invalid buffer or size for allocator initialization\n");
+        printf("Invalid buffer or size for allocator initialization\n");
         gBS->Stall(5 * 1000000); // 5 seconds
         gRT->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
     }
@@ -45,7 +45,7 @@ static bool IsPointerInPool(void* ptr) {
 }
 
 void* Malloc(size_t size) {
-    PRINT(L"Allocating memory of size %llu, ptr = ", size);
+    printf("Allocating memory of size %llu, ptr = ", size);
     size = ALIGN_UP(size, AVX_ALIGN);  // ensure AVX alignment
     struct BlockHeader* best = 0;
     struct BlockHeader* bestPrev = 0;
@@ -64,7 +64,7 @@ void* Malloc(size_t size) {
     }
 
     if (!best) {
-        PRINT(L"NULL\n");
+        printf("NULL\n");
         return 0;
     }
 
@@ -74,7 +74,7 @@ void* Malloc(size_t size) {
 
     size_t totalNeeded = size + padding;
     if (best->size < totalNeeded) {
-        PRINT(L"NULL not enough space\n");
+        printf("NULL not enough space\n");
         return 0; // not enough space
     }
 
@@ -93,12 +93,12 @@ void* Malloc(size_t size) {
     best->free = false;
     best->size = totalNeeded;
 
-    PRINT(L"%p\n", (void*)alignedAddr);
+    printf("%p\n", (void*)alignedAddr);
     return (void*)alignedAddr;
 }
 
 void Free(void* ptr) {
-    PRINT(L"Freeing memory at %p\n", ptr);
+    printf("Freeing memory at %p\n", ptr);
     if (!ptr || !IsPointerInPool(ptr)) return;
 
     struct BlockHeader* block = (struct BlockHeader*)((uint8_t*)ptr - sizeof(struct BlockHeader));
@@ -108,7 +108,7 @@ void Free(void* ptr) {
     }
 
     if (!IsPointerInPool(block) || block->magic != MAGIC_ALLOCATED) {
-        Print(L"Invalid pointer passed to Free: %p\n", ptr);
+        printf("Invalid pointer passed to Free: %p\n", ptr);
         return;
     }
 
@@ -244,7 +244,7 @@ void* ResolveImport(const char* dllName, const char* functionName) {
     }
 
     // If the import is not a known dependency, print an error
-    Print(L"Unknown dll: %a\n", dllName);
+    printf("Unknown dll: %s\n", dllName);
     return NULL;
 }
 
@@ -288,18 +288,18 @@ void* LoadPeImage(void* buffer) {
     uint8_t* data = (uint8_t*)buffer;
     IMAGE_DOS_HEADER* dos = (IMAGE_DOS_HEADER*)data;
     if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
-        Print(L"Invalid MZ header\n");
+        printf("Invalid MZ header\n");
         return NULL;
     }
 
     IMAGE_NT_HEADERS64* pe = (IMAGE_NT_HEADERS64*)(data + dos->e_lfanew);
     if (pe->Signature != IMAGE_NT_SIGNATURE) {
-        Print(L"Invalid PE header\n");
+        printf("Invalid PE header\n");
         return NULL;
     }
 
     if (pe->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
-        Print(L"Not PE32+\n");
+        printf("Not PE32+\n");
         return NULL;
     }
 
@@ -307,7 +307,7 @@ void* LoadPeImage(void* buffer) {
     uint64_t imageSize = pe->OptionalHeader.SizeOfImage;
     uint64_t imageBase = (uint64_t)Malloc(imageSize);
     if (!imageBase) {
-        Print(L"Failed to allocate image memory\n");
+        printf("Failed to allocate image memory\n");
         return NULL;
     }
 
@@ -338,7 +338,7 @@ void* LoadPeImage(void* buffer) {
             while (relocBase < relocEnd) {
                 IMAGE_BASE_RELOCATION* rel = (IMAGE_BASE_RELOCATION*)relocBase;
                 if (rel->SizeOfBlock < sizeof(IMAGE_BASE_RELOCATION)) {
-                    Print(L"Relocation block too small at %p\n", rel);
+                    printf("Relocation block too small at %p\n", rel);
                     return NULL;
                 }
                 uint64_t entryCount = (rel->SizeOfBlock - sizeof(IMAGE_BASE_RELOCATION)) / sizeof(uint16_t);
@@ -353,12 +353,12 @@ void* LoadPeImage(void* buffer) {
                         uint64_t* patchAddr = (uint64_t*)(imageBase + rel->VirtualAddress + offset);
                         // Check patchAddr is within image
                         if ((uintptr_t)patchAddr < imageBase || (uintptr_t)patchAddr >= imageBase + imageSize) {
-                            Print(L"Relocation address out of bounds: %p\n", patchAddr);
+                            printf("Relocation address out of bounds: %p\n", patchAddr);
                             return NULL;
                         }
                         *patchAddr += imageDelta;
                     } else if (type != 0) {
-                        Print(L"Unknown relocation type %u at RVA %x\n", type, (unsigned)(rel->VirtualAddress + offset));
+                        printf("Unknown relocation type %u at RVA %x\n", type, (unsigned)(rel->VirtualAddress + offset));
                         return NULL;
                     }
                 }
@@ -383,7 +383,7 @@ void* LoadPeImage(void* buffer) {
                     void* funcPtr = NULL;
                     if (thunkINT->u1.Ordinal & IMAGE_ORDINAL_FLAG64) {
                         // Import by ordinal - your ResolveImport doesn't support this
-                        Print(L"Import by ordinal is not supported.\n");
+                        printf("Import by ordinal is not supported.\n");
                         return NULL;
                     } else {
                         // Import by name
@@ -392,7 +392,7 @@ void* LoadPeImage(void* buffer) {
                         funcPtr = ResolveImport(dllName, funcName);
 
                         if (!funcPtr) {
-                            Print(L"Failed to resolve import: %a -> %a\n", dllName, importByName->Name);
+                            printf("Failed to resolve import: %s -> %s\n", dllName, importByName->Name);
                             return NULL;
                         }
                     }

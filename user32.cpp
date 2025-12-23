@@ -10,18 +10,18 @@ typedef long LONG_PTR;
 typedef const char* LPCSTR;
 
 // Window stubs
-HWND GetDesktopWindow() { PRINT(L"GetDesktopWindow called\n"); return (HWND)1; }
-HWND GetActiveWindow() { PRINT(L"GetActiveWindow called\n"); return (HWND)1; }
-HWND GetTopWindow(HWND) { PRINT(L"GetTopWindow called\n"); return (HWND)1; }
-HWND GetWindow(HWND, UINT) { PRINT(L"GetWindow called\n"); return (HWND)1; }
-LONG GetWindowLongA(HWND, int) { PRINT(L"GetWindowLongA called\n"); return 0; }
-LONG_PTR GetWindowLongPtrA(HWND, int) { PRINT(L"GetWindowLongPtrA called\n"); return 0; }
-void GetWindowThreadProcessId(HWND, DWORD*) { PRINT(L"GetWindowThreadProcessId called\n"); }
+HWND GetDesktopWindow() { printf("GetDesktopWindow called\n"); return (HWND)1; }
+HWND GetActiveWindow() { printf("GetActiveWindow called\n"); return (HWND)1; }
+HWND GetTopWindow(HWND) { printf("GetTopWindow called\n"); return (HWND)1; }
+HWND GetWindow(HWND, UINT) { printf("GetWindow called\n"); return (HWND)1; }
+LONG GetWindowLongA(HWND, int) { printf("GetWindowLongA called\n"); return 0; }
+LONG_PTR GetWindowLongPtrA(HWND, int) { printf("GetWindowLongPtrA called\n"); return 0; }
+void GetWindowThreadProcessId(HWND, DWORD*) { printf("GetWindowThreadProcessId called\n"); }
 
 // MessageBox
 int MessageBoxA(HWND, LPCSTR text, LPCSTR caption, UINT) {
-    PRINT(L"MessageBoxA called\n");
-    PRINT(L"[MessageBox] %s: %s\n", caption, text);
+    printf("MessageBoxA called\n");
+    printf("[MessageBox] %s: %s\n", caption, text);
     return 1;
 }
 
@@ -46,6 +46,6 @@ void* ResolveUser32(const char* functionName) {
         return MessageBoxA;
     }
 
-    Print(L"Unknown function: %a\n", functionName);
+    printf("Unknown function: %s\n", functionName);
     return NULL;
 }

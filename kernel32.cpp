@@ -170,29 +170,29 @@ extern void Free(void* ptr);
 
 // --- Memory ---
 HANDLE HeapCreate(DWORD, SIZE_T, SIZE_T) {
-    PRINT(L"Called: HeapCreate\n");
+    PRINT("Called: HeapCreate\n");
     return reinterpret_cast<HANDLE>(1);
 }
 
 BOOL HeapDestroy(HANDLE) {
-    PRINT(L"Called: HeapDestroy\n");
+    PRINT("Called: HeapDestroy\n");
     return TRUE; // nothing to do
 }
 
 LPVOID HeapAlloc(HANDLE, DWORD, SIZE_T size) {
-    PRINT(L"Called: HeapAlloc with size: %ull\n", size);
+    PRINT("Called: HeapAlloc with size: %ull\n", size);
     return Malloc(size);
 }
 
 BOOL HeapFree(HANDLE, DWORD, LPVOID ptr) {
-    PRINT(L"Called: HeapFree with ptr: %p\n", ptr);
+    PRINT("Called: HeapFree with ptr: %p\n", ptr);
     if (ptr)
         Free(ptr);
     return TRUE;
 }
 
 LPVOID HeapReAlloc(HANDLE, DWORD, LPVOID ptr, SIZE_T size) {
-    PRINT(L"Called: HeapReAlloc with size: %ull and ptr: %p\n", size, ptr);
+    PRINT("Called: HeapReAlloc with size: %ull and ptr: %p\n", size, ptr);
     if (!ptr) return Malloc(size);
     LPVOID newPtr = Malloc(size);
     if (!newPtr) return nullptr;
@@ -203,23 +203,23 @@ LPVOID HeapReAlloc(HANDLE, DWORD, LPVOID ptr, SIZE_T size) {
 }
 
 SIZE_T HeapSize(HANDLE, DWORD, LPCVOID) {
-    PRINT(L"Called: HeapSize\n");
+    PRINT("Called: HeapSize\n");
     return 0;
 }
 
 // --- Threads (fake, UEFI is single-threaded at boot) ---
 HANDLE GetCurrentThread() {
-    PRINT(L"Called: GetCurrentThread\n");
+    PRINT("Called: GetCurrentThread\n");
     return reinterpret_cast<HANDLE>(1);
 }
 
 HANDLE CreateThread(void*, SIZE_T, LPTHREAD_START_ROUTINE, void*, DWORD, DWORD*) {
-    PRINT(L"Called: CreateThread\n");
+    PRINT("Called: CreateThread\n");
     return reinterpret_cast<HANDLE>(1);
 }
 
 DWORD WaitForSingleObject(HANDLE, DWORD) {
-    PRINT(L"Called: WaitForSingleObject\n");
+    PRINT("Called: WaitForSingleObject\n");
     return 0;
 }
 
@@ -287,66 +287,66 @@ DWORD GetTickCount() {
 
 // --- Module / File ---
 HMODULE GetModuleHandleA(LPCSTR name) {
-    PRINT(L"Called: GetModuleHandleA with name: %a\n", name);
+    PRINT("Called: GetModuleHandleA with name: %s\n", name);
     return reinterpret_cast<HMODULE>(1);
 }
 
 void SleepConditionVariableCS(void*, void*, unsigned) {
-    PRINT(L"Called: SleepConditionVariableCS\n");
+    PRINT("Called: SleepConditionVariableCS\n");
 }
 
 BOOL TryEnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT(L"Called: TryEnterCriticalSection\n");
+    PRINT("Called: TryEnterCriticalSection\n");
     return TRUE;
 }
 
 BOOL GetLogicalProcessorInformation(void*, void*) {
-    PRINT(L"Called: GetLogicalProcessorInformation\n");
+    PRINT("Called: GetLogicalProcessorInformation\n");
     return FALSE;
 }
 
 void InitializeConditionVariable(void* cond) {
-    PRINT(L"Called: InitializeConditionVariable\n");
+    PRINT("Called: InitializeConditionVariable\n");
     // No-op stub
 }
 
 int timeBeginPeriod(UINT period) {
-    PRINT(L"Called: timeBeginPeriod\n");
+    PRINT("Called: timeBeginPeriod\n");
     return 0;
 }
 
 int timeEndPeriod(UINT period) {
-    PRINT(L"Called: timeEndPeriod\n");
+    PRINT("Called: timeEndPeriod\n");
     return 0;
 }
 
 void WakeConditionVariable(void* cond) {
-    PRINT(L"Called: WakeConditionVariable\n");
+    PRINT("Called: WakeConditionVariable\n");
     // No-op stub
 }
 
 void WakeAllConditionVariable(void* cond) {
-    PRINT(L"Called: WakeAllConditionVariable\n");
+    PRINT("Called: WakeAllConditionVariable\n");
     // No-op stub
 }
 
 BOOL InitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection, DWORD dwSpinCount) {
-    PRINT(L"Called: InitializeCriticalSectionAndSpinCount\n");
+    PRINT("Called: InitializeCriticalSectionAndSpinCount\n");
     return TRUE;
 }
 
-int waveOutOpen() { PRINT(L"Called: waveOutOpen\n"); return 0; }
-int waveOutPause() { PRINT(L"Called: waveOutPause\n"); return 0; }
-int waveOutPrepareHeader() { PRINT(L"Called: waveOutPrepareHeader\n"); return 0; }
-int waveOutUnprepareHeader() { PRINT(L"Called: waveOutUnprepareHeader\n"); return 0; }
-int waveOutWrite() { PRINT(L"Called: waveOutWrite\n"); return 0; }
-int waveOutReset() { PRINT(L"Called: waveOutReset\n"); return 0; }
-int waveOutClose() { PRINT(L"Called: waveOutClose\n"); return 0; }
-int waveOutRestart() { PRINT(L"Called: waveOutRestart\n"); return 0; }
-int waveOutSetVolume() { PRINT(L"Called: waveOutSetVolume\n"); return 0; }
+int waveOutOpen() { PRINT("Called: waveOutOpen\n"); return 0; }
+int waveOutPause() { PRINT("Called: waveOutPause\n"); return 0; }
+int waveOutPrepareHeader() { PRINT("Called: waveOutPrepareHeader\n"); return 0; }
+int waveOutUnprepareHeader() { PRINT("Called: waveOutUnprepareHeader\n"); return 0; }
+int waveOutWrite() { PRINT("Called: waveOutWrite\n"); return 0; }
+int waveOutReset() { PRINT("Called: waveOutReset\n"); return 0; }
+int waveOutClose() { PRINT("Called: waveOutClose\n"); return 0; }
+int waveOutRestart() { PRINT("Called: waveOutRestart\n"); return 0; }
+int waveOutSetVolume() { PRINT("Called: waveOutSetVolume\n"); return 0; }
 
 FARPROC GetProcAddress(HMODULE, LPCSTR func) {
-    PRINT(L"Called: GetProcAddress with func: %a\n", func);
+    PRINT("Called: GetProcAddress with func: %s\n", func);
     if (stricmp(func, "waveOutOpen") == 0) {
         return reinterpret_cast<FARPROC>(waveOutOpen);
     }
@@ -401,28 +401,28 @@ FARPROC GetProcAddress(HMODULE, LPCSTR func) {
     else if (stricmp(func, "WakeAllConditionVariable") == 0) {
         return reinterpret_cast<FARPROC>(WakeAllConditionVariable);
     }
-    PRINT(L"Unknown function requested!\n");
+    PRINT("Unknown function requested!\n");
     return nullptr;
 }
 
 HMODULE LoadLibraryA(LPCSTR name) {
-    PRINT(L"Called: LoadLibraryA with name: %a\n", name);
+    PRINT("Called: LoadLibraryA with name: %s\n", name);
     return reinterpret_cast<HMODULE>(1);
 }
 
 // --- Process ---
 DWORD GetCurrentProcessId() {
-    PRINT(L"Called: GetCurrentProcessId\n");
+    PRINT("Called: GetCurrentProcessId\n");
     return 1;
 }
 
 void ExitProcess(UINT uExitCode) {
-    PRINT(L"Called: ExitProcess\n");
+    PRINT("Called: ExitProcess\n");
     while(1); // halt
 }
 
 DWORD GetSystemDirectoryA(LPSTR lpBuffer, DWORD uSize) {
-    PRINT(L"Called: GetSystemDirectoryA\n");
+    PRINT("Called: GetSystemDirectoryA\n");
     if (lpBuffer && uSize > 0) {
         *lpBuffer = '\0';
         return 1;
@@ -431,7 +431,7 @@ DWORD GetSystemDirectoryA(LPSTR lpBuffer, DWORD uSize) {
 }
 
 DWORD GetWindowsDirectoryA(LPSTR lpBuffer, DWORD uSize) {
-    PRINT(L"Called: GetWindowsDirectoryA\n");
+    PRINT("Called: GetWindowsDirectoryA\n");
     if (lpBuffer && uSize > 0) {
         *lpBuffer = '\0';
         return 1;
@@ -440,7 +440,7 @@ DWORD GetWindowsDirectoryA(LPSTR lpBuffer, DWORD uSize) {
 }
 
 DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize) {
-    PRINT(L"Called: GetModuleFileNameA\n");
+    PRINT("Called: GetModuleFileNameA\n");
     if (lpFilename && nSize > 0) {
         *lpFilename = '\0';
         return 1;
@@ -449,255 +449,255 @@ DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize) {
 }
 
 void Sleep(DWORD dwMilliseconds) {
-    PRINT(L"Called: Sleep\n");
+    PRINT("Called: Sleep\n");
     UINTN microseconds = (UINTN)dwMilliseconds * 1000;
     BS->Stall(microseconds);
 }
 
 DWORD SetErrorMode(DWORD uMode) {
-    PRINT(L"Called: SetErrorMode\n");
+    PRINT("Called: SetErrorMode\n");
     return 0;
 }
 
 DWORD GetEnvironmentVariableA(LPCTSTR lpName, LPSTR lpBuffer, DWORD nSize) {
-    PRINT(L"Called: GetEnvironmentVariableA\n");
+    PRINT("Called: GetEnvironmentVariableA\n");
     if (lpBuffer && nSize > 0) lpBuffer[0] = 0;
     return 1;
 }
 
 BOOL CloseHandle(HANDLE hObject) {
-    PRINT(L"Called: CloseHandle\n");
+    PRINT("Called: CloseHandle\n");
     return TRUE;
 }
 
 DWORD GetLastError() {
-    PRINT(L"Called: GetLastError\n");
+    PRINT("Called: GetLastError\n");
     return 0;
 }
 
 DWORD GetFileSize(HANDLE hFile, LPDWORD lpFileSizeHigh) {
-    PRINT(L"Called: GetFileSize\n");
+    PRINT("Called: GetFileSize\n");
     if (lpFileSizeHigh) *lpFileSizeHigh = 0;
     return 0;
 }
 
 HANDLE CreateFileA(LPCTSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes, HANDLE hTemplateFile) {
-    PRINT(L"Called: CreateFileA\n");
+    PRINT("Called: CreateFileA\n");
     return NULL;
 }
 
 BOOL ReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) {
-    PRINT(L"Called: ReadFile\n");
+    PRINT("Called: ReadFile\n");
     *lpNumberOfBytesRead = 0;
     return TRUE;
 }
 
 DWORD SetFilePointer(HANDLE hFile, LONG lDistanceToMove, PLONG lpDistanceToMoveHigh, DWORD dwMoveMethod) {
-    PRINT(L"Called: SetFilePointer\n");
+    PRINT("Called: SetFilePointer\n");
     return 0;
 }
 
 BOOL FreeLibrary(HMODULE hLibModule) {
-    PRINT(L"Called: FreeLibrary\n");
+    PRINT("Called: FreeLibrary\n");
     return TRUE;
 }
 
 int GetThreadPriority(HANDLE hThread) {
-    PRINT(L"Called: GetThreadPriority\n");
+    PRINT("Called: GetThreadPriority\n");
     return 0;
 }
 
 PVOID RemoveVectoredExceptionHandler(PVOID Handle) {
-    PRINT(L"Called: RemoveVectoredExceptionHandler\n");
+    PRINT("Called: RemoveVectoredExceptionHandler\n");
     return NULL;
 }
 
 void RaiseException(DWORD dwExceptionCode, DWORD dwExceptionFlags, DWORD nNumberOfArguments, const ULONG_PTR* lpArguments) {
-    PRINT(L"Called: RaiseException\n");
+    PRINT("Called: RaiseException\n");
     return;
 }
 
 PVOID AddVectoredExceptionHandler(ULONG FirstHandler, PVECTORED_EXCEPTION_HANDLER VectoredHandler) {
-    PRINT(L"Called: AddVectoredExceptionHandler\n");
+    PRINT("Called: AddVectoredExceptionHandler\n");
     return NULL;
 }
 
 DWORD_PTR SetThreadAffinityMask(HANDLE hThread, DWORD_PTR dwThreadAffinityMask) {
-    PRINT(L"Called: SetThreadAffinityMask\n");
+    PRINT("Called: SetThreadAffinityMask\n");
     return 1;
 }
 
 DWORD ResumeThread(HANDLE hThread) {
-    PRINT(L"Called: ResumeThread\n");
+    PRINT("Called: ResumeThread\n");
     return 1;
 }
 
 BOOL SetThreadPriority(HANDLE hThread, int nPriority) {
-    PRINT(L"Called: SetThreadPriority\n");
+    PRINT("Called: SetThreadPriority\n");
     return TRUE;
 }
 
 void InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT(L"Called: InitializeCriticalSection\n");
+    PRINT("Called: InitializeCriticalSection\n");
 }
 
 void DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT(L"Called: DeleteCriticalSection\n");
+    PRINT("Called: DeleteCriticalSection\n");
 }
 
 void EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT(L"Called: EnterCriticalSection\n");
+    PRINT("Called: EnterCriticalSection\n");
 }
 
 void LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT(L"Called: LeaveCriticalSection\n");
+    PRINT("Called: LeaveCriticalSection\n");
 }
 
 DWORD GetCurrentThreadId() {
-    PRINT(L"Called: GetCurrentThreadId\n");
+    PRINT("Called: GetCurrentThreadId\n");
     return 1;
 }
 
 HANDLE CreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCTSTR lpName) {
-    PRINT(L"Called: CreateMutexA with name: lpName: %a\n", lpName);
+    PRINT("Called: CreateMutexA with name: lpName: %s\n", lpName);
     return reinterpret_cast<HANDLE>(1);
 }
 
 BOOL ReleaseMutex(HANDLE hMutex) {
-    PRINT(L"Called: ReleaseMutex\n");
+    PRINT("Called: ReleaseMutex\n");
     return TRUE;
 }
 
 HANDLE CreateSemaphoreA(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes, LONG lInitialCount, LONG lMaximumCount, LPCTSTR lpName) {
-    PRINT(L"Called: CreateSemaphoreA with name: lpName: %a\n", lpName);
+    PRINT("Called: CreateSemaphoreA with name: lpName: %s\n", lpName);
     return reinterpret_cast<HANDLE>(1);
 }
 
 BOOL ReleaseSemaphore(HANDLE hSemaphore, LONG lReleaseCount, LPLONG lpPreviousCount) {
-    PRINT(L"Called: ReleaseSemaphore\n");
+    PRINT("Called: ReleaseSemaphore\n");
     if (lpPreviousCount) *lpPreviousCount = 0;
     return TRUE;
 }
 
 BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode) {
-    PRINT(L"Called: TerminateProcess\n");
+    PRINT("Called: TerminateProcess\n");
     return TRUE;
 }
 
 HANDLE GetCurrentProcess() {
-    PRINT(L"Called: GetCurrentProcess\n");
+    PRINT("Called: GetCurrentProcess\n");
     return reinterpret_cast<HANDLE>(1);
 }
 
 LPTOP_LEVEL_EXCEPTION_FILTER UnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter) {
-    PRINT(L"Called: UnhandledExceptionFilter\n");
+    PRINT("Called: UnhandledExceptionFilter\n");
     return NULL;
 }
 
 LPTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter) {
-    PRINT(L"Called: SetUnhandledExceptionFilter\n");
+    PRINT("Called: SetUnhandledExceptionFilter\n");
     return NULL;
 }
 
 BOOL IsDebuggerPresent() {
-    PRINT(L"Called: IsDebuggerPresent\n");
+    PRINT("Called: IsDebuggerPresent\n");
     return FALSE;
 }
 
 PVOID RtlVirtualUnwind(ULONG HandlerType, ULONG64 ImageBase, ULONG64 ControlPc, PRUNTIME_FUNCTION FunctionEntry, PCONTEXT ContextRecord, PVOID* HandlerData, PULONG64 EstablisherFrame, PCONTEXT ContextRecord2) {
-    PRINT(L"Called: RtlVirtualUnwind\n");
+    PRINT("Called: RtlVirtualUnwind\n");
     return NULL;
 }
 
 PRUNTIME_FUNCTION RtlLookupFunctionEntry(ULONG64 ControlPc, PULONG64 ImageBase, PVOID HistoryTable) {
-    PRINT(L"Called: RtlLookupFunctionEntry\n");
+    PRINT("Called: RtlLookupFunctionEntry\n");
     return NULL;
 }
 
 void RtlCaptureContext(PCONTEXT ContextRecord) {
-    PRINT(L"Called: RtlCaptureContext\n");
+    PRINT("Called: RtlCaptureContext\n");
 }
 
 void RtlUnwindEx(PVOID TargetFrame, PVOID TargetIp, PVOID ExceptionRecord, PVOID ReturnValue, PCONTEXT ContextRecord, PVOID HistoryTable) {
-    PRINT(L"Called: RtlUnwindEx\n");
+    PRINT("Called: RtlUnwindEx\n");
 }
 
 BOOL WriteFile(HANDLE hFile, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfBytesWritten, LPOVERLAPPED lpOverlapped) {
-    PRINT(L"Called: WriteFile\n");
+    PRINT("Called: WriteFile\n");
     if (lpNumberOfBytesWritten) *lpNumberOfBytesWritten = 0;
     return TRUE;
 }
 
 HMODULE GetModuleHandleW(LPCWSTR lpModuleName) {
-    PRINT(L"Called: GetModuleHandleW with name: %s\n", lpModuleName);
+    PRINT("Called: GetModuleHandleW with name: %s\n", lpModuleName);
     return NULL;
 }
 
 int SetHandleCount(int n) {
-    PRINT(L"Called: SetHandleCount\n");
+    PRINT("Called: SetHandleCount\n");
     return 0;
 }
 
 HANDLE GetStdHandle(DWORD nStdHandle) {
-    PRINT(L"Called: GetStdHandle\n");
+    PRINT("Called: GetStdHandle\n");
     return reinterpret_cast<HANDLE>(1);
 }
 
 DWORD GetFileType(HANDLE hFile) {
-    PRINT(L"Called: GetFileType\n");
+    PRINT("Called: GetFileType\n");
     return 0;
 }
 
 void GetStartupInfoA(LPSTARTUPINFOA lpStartupInfo) {
-    PRINT(L"Called: GetStartupInfoA\n");
+    PRINT("Called: GetStartupInfoA\n");
 }
 
 LPCH GetEnvironmentStrings() {
-    PRINT(L"Called: GetEnvironmentStrings\n");
+    PRINT("Called: GetEnvironmentStrings\n");
     return NULL;
 }
 
 BOOL FreeEnvironmentStringsA(LPCH lpszString) {
-    PRINT(L"Called: FreeEnvironmentStringsA\n");
+    PRINT("Called: FreeEnvironmentStringsA\n");
     return TRUE;
 }
 
 LPWCH GetEnvironmentStringsW() {
-    PRINT(L"Called: GetEnvironmentStringsW\n");
+    PRINT("Called: GetEnvironmentStringsW\n");
     return NULL;
 }
 
 BOOL FreeEnvironmentStringsW(LPWCH lpszString) {
-    PRINT(L"Called: FreeEnvironmentStringsW\n");
+    PRINT("Called: FreeEnvironmentStringsW\n");
     return TRUE;
 }
 
 void GetSystemTimeAsFileTime(LPFILETIME lpSystemTimeAsFileTime) {
-    PRINT(L"Called: GetSystemTimeAsFileTime\n");
+    PRINT("Called: GetSystemTimeAsFileTime\n");
 }
 
 int GetACP() {
-    PRINT(L"Called: GetACP\n");
+    PRINT("Called: GetACP\n");
     return 0;
 }
 
 BOOL GetCPInfo(UINT CodePage, LPCPINFO lpCPInfo) {
-    PRINT(L"Called: GetCPInfo\n");
+    PRINT("Called: GetCPInfo\n");
     return FALSE;
 }
 
 UINT GetOEMCP() {
-    PRINT(L"Called: GetOEMCP\n");
+    PRINT("Called: GetOEMCP\n");
     return 0;
 }
 
 BOOL IsValidCodePage(UINT CodePage) {
-    PRINT(L"Called: IsValidCodePage\n");
+    PRINT("Called: IsValidCodePage\n");
     return FALSE;
 }
 
 int WideCharToMultiByte(UINT CodePage, DWORD dwFlags, LPCWSTR lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, LPCSTR lpDefaultChar, LPBOOL lpUsedDefaultChar) {
-    PRINT(L"Called: WideCharToMultiByte\n");
+    PRINT("Called: WideCharToMultiByte\n");
     if (lpWideCharStr == NULL || cchWideChar <= 0) {
         return 0; // Return 0 for invalid input
     }
@@ -719,77 +719,77 @@ int WideCharToMultiByte(UINT CodePage, DWORD dwFlags, LPCWSTR lpWideCharStr, int
 }
 
 int LCMapStringA(LCID Locale, DWORD dwMapFlags, LPCSTR lpSrcStr, int cchSrc, LPSTR lpDestStr, int cchDest) {
-    PRINT(L"Called: LCMapStringA\n");
+    PRINT("Called: LCMapStringA\n");
     return 0;
 }
 
 int LCMapStringW(LCID Locale, DWORD dwMapFlags, LPCWSTR lpSrcStr, int cchSrc, LPWSTR lpDestStr, int cchDest) {
-    PRINT(L"Called: LCMapStringW\n");
+    PRINT("Called: LCMapStringW\n");
     return 0;
 }
 
 BOOL GetStringTypeA(LCID Locale, DWORD dwInfoType, LPCSTR lpSrcStr, int cchSrc, LPWORD lpCharType) {
-    PRINT(L"Called: GetStringTypeA\n");
+    PRINT("Called: GetStringTypeA\n");
     return FALSE;
 }
 
 BOOL GetStringTypeW(DWORD dwInfoType, LPCWSTR lpSrcStr, int cchSrc, LPWORD lpCharType) {
-    PRINT(L"Called: GetStringTypeW\n");
+    PRINT("Called: GetStringTypeW\n");
     return FALSE;
 }
 
 int GetLocaleInfoA(LCID Locale, LCTYPE LCType, LPSTR lpLCData, int cchData) {
-    PRINT(L"Called: GetLocaleInfoA\n");
+    PRINT("Called: GetLocaleInfoA\n");
     *lpLCData = '\0';
     return 1;
 }
 
 BOOL FlsSetValue(DWORD dwFlsIndex, PVOID lpFlsData) {
-    PRINT(L"Called: FlsSetValue\n");
+    PRINT("Called: FlsSetValue\n");
     return TRUE;
 }
 
 PSTR GetCommandLineA() {
-    PRINT(L"Called: GetCommandLineA\n");
+    PRINT("Called: GetCommandLineA\n");
     return NULL;
 }
 
 LPVOID EncodePointer(LPVOID Ptr) {
-    PRINT(L"Called: EncodePointer\n");
+    PRINT("Called: EncodePointer\n");
     return Ptr;
 }
 
 LPVOID DecodePointer(LPVOID Ptr) {
-    PRINT(L"Called: DecodePointer\n");
+    PRINT("Called: DecodePointer\n");
     return Ptr;
 }
 
 BOOL FlsGetValue(DWORD dwFlsIndex) {
-    PRINT(L"Called: FlsGetValue\n");
+    PRINT("Called: FlsGetValue\n");
     return NULL;
 }
 
 BOOL FlsFree(DWORD dwFlsIndex) {
-    PRINT(L"Called: FlsFree\n");
+    PRINT("Called: FlsFree\n");
     return TRUE;
 }
 
 void SetLastError(DWORD dwErrCode) {
-    PRINT(L"Called: SetLastError\n");
+    PRINT("Called: SetLastError\n");
 }
 
 DWORD FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback) {
-    PRINT(L"Called: FlsAlloc\n");
+    PRINT("Called: FlsAlloc\n");
     return 0;
 }
 
 BOOL HeapSetInformation(HANDLE HeapHandle, HEAP_INFORMATION_CLASS HeapInformationClass, PVOID HeapInformation, SIZE_T HeapInformationLength) {
-    PRINT(L"Called: HeapSetInformation\n");
+    PRINT("Called: HeapSetInformation\n");
     return TRUE;
 }
 
 void GetSystemInfo(LPSYSTEM_INFO lpSystemInfo) {
-    PRINT(L"Called: GetSystemInfo\n");
+    PRINT("Called: GetSystemInfo\n");
     if (lpSystemInfo) {
         // Fill the struct with dummy values consistent with an x64 environment
         lpSystemInfo->DUMMYUNIONNAME.DUMMYSTRUCTNAME.wProcessorArchitecture = 9; // PROCESSOR_ARCHITECTURE_AMD64
@@ -806,7 +806,7 @@ void GetSystemInfo(LPSYSTEM_INFO lpSystemInfo) {
 }
 
 int MultiByteToWideChar(UINT CodePage, DWORD dwFlags, LPCSTR lpMultiByteStr, int cbMultiByte, LPWSTR lpWideCharStr, int cchWideChar) {
-    PRINT(L"Called: MultiByteToWideChar\n");
+    PRINT("Called: MultiByteToWideChar\n");
     if (lpMultiByteStr == NULL || cchWideChar <= 0) {
         return 0; // Return 0 for invalid input
     }
@@ -1012,6 +1012,6 @@ void* ResolveKernel32(const char* functionName) {
         return MultiByteToWideChar;
     }
     
-    Print(L"Unknown function: %a\n", functionName);
+    printf("Unknown function: %s\n", functionName);
     return NULL;
 }

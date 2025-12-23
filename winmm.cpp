@@ -27,6 +27,6 @@ void* ResolveWinMM(const char* functionName) {
         return timeGetTime;
     }
     
-    Print(L"Unknown function: %a\n", functionName);
+    printf("Unknown function: %s\n", functionName);
     return NULL;
 }
