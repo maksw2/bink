@@ -467,16 +467,15 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         }
         
         // Wait for the next frame
-        if (pBinkWait(bink)) {
+        while (pBinkWait(bink)) {
             _mm_pause(); // don't burn CPU cycles
-            continue; // wait for the next frame
         }
 
         // Check if we should skip the frame
-        if (pBinkShouldSkip(bink)) {
+        while (pBinkShouldSkip(bink)) {
             pBinkNextFrame(bink);
+            pBinkDoFrame(bink);
             skipped++;
-            continue; // skip this frame
         }
 
         int code = pBinkDoFrame(bink);
@@ -484,6 +483,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
             printf("BinkDoFrame failed!\n");
             pBinkClose(bink);
             Free(video_file);
+            Free(framebuffer);
             gBS->Stall(5 * 1000 * 1000);
             gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
             return 1;
@@ -503,6 +503,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
             printf("BinkCopyToBuffer failed!\n");
             pBinkClose(bink);
             Free(video_file);
+            Free(framebuffer);
             gBS->Stall(5 * 1000 * 1000);
             gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
             return 1;

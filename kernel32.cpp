@@ -191,13 +191,27 @@ BOOL HeapFree(HANDLE, DWORD, LPVOID ptr) {
     return TRUE;
 }
 
+static void *memcpy(void *dest, const void *src, size_t n) {
+    // Cast the void pointers to char pointers so we can perform byte-wise arithmetic
+    unsigned char *d = (unsigned char *)dest;
+    const unsigned char *s = (const unsigned char *)src;
+
+    // Copy each byte from src to dest
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+
+    // Return the original destination pointer
+    return dest;
+}
+
 LPVOID HeapReAlloc(HANDLE, DWORD, LPVOID ptr, SIZE_T size) {
     PRINT("Called: HeapReAlloc with size: %ull and ptr: %p\n", size, ptr);
     if (!ptr) return Malloc(size);
     LPVOID newPtr = Malloc(size);
     if (!newPtr) return nullptr;
     // No original size info; can't fully emulate, user must handle
-    CopyMem(newPtr, ptr, size);
+    memcpy(newPtr, ptr, size);
     Free(ptr);
     return newPtr;
 }
@@ -221,6 +235,58 @@ HANDLE CreateThread(void*, SIZE_T, LPTHREAD_START_ROUTINE, void*, DWORD, DWORD*)
 DWORD WaitForSingleObject(HANDLE, DWORD) {
     PRINT("Called: WaitForSingleObject\n");
     return 0;
+}
+
+DWORD ResumeThread(HANDLE hThread) {
+    PRINT("Called: ResumeThread\n");
+    return 1;
+}
+
+BOOL SetThreadPriority(HANDLE hThread, int nPriority) {
+    PRINT("Called: SetThreadPriority\n");
+    return TRUE;
+}
+
+void InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT("Called: InitializeCriticalSection\n");
+}
+
+void DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT("Called: DeleteCriticalSection\n");
+}
+
+void EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT("Called: EnterCriticalSection\n");
+}
+
+void LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
+    PRINT("Called: LeaveCriticalSection\n");
+}
+
+DWORD GetCurrentThreadId() {
+    PRINT("Called: GetCurrentThreadId\n");
+    return 1;
+}
+
+HANDLE CreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCTSTR lpName) {
+    PRINT("Called: CreateMutexA with name: lpName: %s\n", lpName);
+    return reinterpret_cast<HANDLE>(1);
+}
+
+BOOL ReleaseMutex(HANDLE hMutex) {
+    PRINT("Called: ReleaseMutex\n");
+    return TRUE;
+}
+
+HANDLE CreateSemaphoreA(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes, LONG lInitialCount, LONG lMaximumCount, LPCTSTR lpName) {
+    PRINT("Called: CreateSemaphoreA with name: lpName: %s\n", lpName);
+    return reinterpret_cast<HANDLE>(1);
+}
+
+BOOL ReleaseSemaphore(HANDLE hSemaphore, LONG lReleaseCount, LPLONG lpPreviousCount) {
+    PRINT("Called: ReleaseSemaphore\n");
+    if (lpPreviousCount) *lpPreviousCount = 0;
+    return TRUE;
 }
 
 // --- Timing ---
@@ -282,7 +348,28 @@ BOOL QueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)
 DWORD GetTickCount() {
     LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
-    return (DWORD)(counter.QuadPart / 1000ULL); // ms
+    return (DWORD)counter.QuadPart;
+}
+
+void Sleep(DWORD dwMilliseconds) {
+    if (dwMilliseconds == 0) return;
+
+    // Ensure calibration has happened
+    if (!g_QpcInitialized) {
+        LARGE_INTEGER freq;
+        QueryPerformanceFrequency(&freq);
+    }
+
+    unsigned long long start = read_tsc();
+    
+    // Calculate how many total TSC ticks we need to wait
+    unsigned long long ticksToWait = (unsigned long long)dwMilliseconds * g_TicksPerMs;
+    
+    // Busy-wait until the TSC difference reaches the target
+    // We use _mm_pause() to be friendly to the CPU pipeline during the loop
+    while ((read_tsc() - start) < ticksToWait) {
+        _mm_pause(); 
+    }
 }
 
 // --- Module / File ---
@@ -448,12 +535,6 @@ DWORD GetModuleFileNameA(HMODULE hModule, LPSTR lpFilename, DWORD nSize) {
     return 0;
 }
 
-void Sleep(DWORD dwMilliseconds) {
-    PRINT("Called: Sleep\n");
-    UINTN microseconds = (UINTN)dwMilliseconds * 1000;
-    BS->Stall(microseconds);
-}
-
 DWORD SetErrorMode(DWORD uMode) {
     PRINT("Called: SetErrorMode\n");
     return 0;
@@ -527,60 +608,8 @@ DWORD_PTR SetThreadAffinityMask(HANDLE hThread, DWORD_PTR dwThreadAffinityMask) 
     return 1;
 }
 
-DWORD ResumeThread(HANDLE hThread) {
-    PRINT("Called: ResumeThread\n");
-    return 1;
-}
-
-BOOL SetThreadPriority(HANDLE hThread, int nPriority) {
-    PRINT("Called: SetThreadPriority\n");
-    return TRUE;
-}
-
-void InitializeCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT("Called: InitializeCriticalSection\n");
-}
-
-void DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT("Called: DeleteCriticalSection\n");
-}
-
-void EnterCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT("Called: EnterCriticalSection\n");
-}
-
-void LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection) {
-    PRINT("Called: LeaveCriticalSection\n");
-}
-
-DWORD GetCurrentThreadId() {
-    PRINT("Called: GetCurrentThreadId\n");
-    return 1;
-}
-
-HANDLE CreateMutexA(LPSECURITY_ATTRIBUTES lpMutexAttributes, BOOL bInitialOwner, LPCTSTR lpName) {
-    PRINT("Called: CreateMutexA with name: lpName: %s\n", lpName);
-    return reinterpret_cast<HANDLE>(1);
-}
-
-BOOL ReleaseMutex(HANDLE hMutex) {
-    PRINT("Called: ReleaseMutex\n");
-    return TRUE;
-}
-
-HANDLE CreateSemaphoreA(LPSECURITY_ATTRIBUTES lpSemaphoreAttributes, LONG lInitialCount, LONG lMaximumCount, LPCTSTR lpName) {
-    PRINT("Called: CreateSemaphoreA with name: lpName: %s\n", lpName);
-    return reinterpret_cast<HANDLE>(1);
-}
-
-BOOL ReleaseSemaphore(HANDLE hSemaphore, LONG lReleaseCount, LPLONG lpPreviousCount) {
-    PRINT("Called: ReleaseSemaphore\n");
-    if (lpPreviousCount) *lpPreviousCount = 0;
-    return TRUE;
-}
-
 BOOL TerminateProcess(HANDLE hProcess, UINT uExitCode) {
-    PRINT("Called: TerminateProcess\n");
+    PRINT("!! Called: TerminateProcess\n");
     return TRUE;
 }
 
