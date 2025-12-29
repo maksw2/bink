@@ -191,47 +191,6 @@ bool LoadBinkDLL(EFI_FILE_HANDLE volume) {
     return true;
 }
 
-void Blit_AVX2_NT(
-    EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop,
-    uint32_t *src, 
-    UINTN src_width, UINTN src_height
-) {
-    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *info = Gop->Mode->Info;
-    UINTN fb_width  = info->HorizontalResolution;
-    UINTN fb_height = info->VerticalResolution;
-    UINTN stride    = info->PixelsPerScanLine;
-
-    uint32_t *fb = (uint32_t *)Gop->Mode->FrameBufferBase;
-
-    // Center offsets
-    UINTN x0 = (fb_width  - src_width) / 2;
-    UINTN y0 = (fb_height - src_height) / 2;
-
-    for (UINTN y = 0; y < src_height; y++) {
-        uint32_t *dst = fb + (y0 + y) * stride + x0;
-        uint32_t *s   = src + y * src_width;
-
-        UINTN x = 0;
-
-        // Align destination pointer to 32-byte boundary for AVX2 streaming
-        for (; ((uintptr_t)(dst + x) & 31) && x < src_width; x++)
-            dst[x] = s[x];
-
-        // Copy 8 pixels (32 bytes) at a time using AVX2 non-temporal stores
-        for (; x + 7 < src_width; x += 8) {
-            __m256i data = _mm256_loadu_si256((__m256i *)(s + x));
-            _mm256_stream_si256((__m256i *)(dst + x), data);
-        }
-
-        // Copy any remaining pixels
-        for (; x < src_width; x++)
-            dst[x] = s[x];
-    }
-
-    // Ensure non-temporal stores are flushed to memory
-    _mm_sfence();
-}
-
 EFI_STATUS SetMaxResolution(EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop) {
     EFI_STATUS Status;
     EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *MaxModeInfo;
@@ -413,7 +372,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     printf("BinkSet* called\n");
 
-    void* video_file = LoadFile(volume, L"idk.bk2");
+    void* video_file = LoadFile(volume, L"video.bk2");
 
     printf("Video file loaded into memory\n");
 
@@ -437,7 +396,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     printf("Framebuffer allocated!\n");
 
     EFI_INPUT_KEY key;
-    bool paused = false;
+    bool paused = true;
     uint64_t skipped = 0;
 
     // start the decode loop
@@ -467,15 +426,17 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         }
         
         // Wait for the next frame
-        while (pBinkWait(bink)) {
+        if (pBinkWait(bink)) {
             _mm_pause(); // don't burn CPU cycles
+            continue;
         }
 
         // Check if we should skip the frame
-        while (pBinkShouldSkip(bink)) {
+        if (pBinkShouldSkip(bink)) {
             pBinkNextFrame(bink);
             pBinkDoFrame(bink);
             skipped++;
+            continue;
         }
 
         int code = pBinkDoFrame(bink);
@@ -490,7 +451,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         }
 
         // Copy frame to our buffer
-        code = pBinkCopyToBuffer(
+        pBinkCopyToBuffer(
             bink,
             framebuffer,
             width * 4,
@@ -499,19 +460,20 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
             0,
             BINKSURFACE32 | BINKCOPYALL
         );
-        if (code != 0 && code != 1) { // who knows what they mean
-            printf("BinkCopyToBuffer failed!\n");
-            pBinkClose(bink);
-            Free(video_file);
-            Free(framebuffer);
-            gBS->Stall(5 * 1000 * 1000);
-            gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
-            return 1;
-        }
         
         pBinkNextFrame(bink);
 
-        Blit_AVX2_NT(gop, framebuffer, width, height);
+        gop->Blt(
+            gop,
+            (EFI_GRAPHICS_OUTPUT_BLT_PIXEL *)framebuffer,
+            EfiBltBufferToVideo,
+            0, 0,
+            (gop->Mode->Info->HorizontalResolution - width) / 2,
+            (gop->Mode->Info->VerticalResolution - height) / 2,
+            width,
+            height,
+            0
+        );
 
         if (bink->FrameNum % 10 == 0)
             printf("\rframe %d done    ", bink->FrameNum);
