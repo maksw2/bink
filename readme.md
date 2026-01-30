@@ -22,11 +22,13 @@ a simple bink player.. running under uefi!
 
 ## how?
 
-from the outside it looks like wine but less running under uefi instead of linux.
+from the outside it looks like wine but less running under uefi instead of linux.  
+i respect the firmware, but i also make it dance.
 
 ## legal?
 
-nobody noticed my project yet.
+nobody noticed this yet.  
+either a job offer or a C&D 🙏
 
 ## how 2 build
 
@@ -35,15 +37,21 @@ open x64 vs dev prompt
 - `run.bat`
 - enjoy
 
-the video to play is fatroot/idk.bk2 (for now for testing, before it was video.bk2 and earlies video.bik)
+the video to play is fatroot/video.bk2
 
 ## q&a
 
 Q: Why does it exist?  
-A: Cool idea + time = explosive mix.
+A: Science isn't about 'why', it's about 'why not'.
+
+Q: Why not raw frames?  
+A: Too simple.
 
 Q: Is this finished?  
 A: Some parts yes.
+
+Q: Can I use this in production?  
+A: Define production.
 
 Q: Will you add audio?  
 A: soon™

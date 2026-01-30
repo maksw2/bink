@@ -422,15 +422,17 @@ BOOL InitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection,
     return TRUE;
 }
 
-int waveOutOpen() { PRINT("Called: waveOutOpen\n"); return 0; }
-int waveOutPause() { PRINT("Called: waveOutPause\n"); return 0; }
-int waveOutPrepareHeader() { PRINT("Called: waveOutPrepareHeader\n"); return 0; }
-int waveOutUnprepareHeader() { PRINT("Called: waveOutUnprepareHeader\n"); return 0; }
-int waveOutWrite() { PRINT("Called: waveOutWrite\n"); return 0; }
-int waveOutReset() { PRINT("Called: waveOutReset\n"); return 0; }
-int waveOutClose() { PRINT("Called: waveOutClose\n"); return 0; }
-int waveOutRestart() { PRINT("Called: waveOutRestart\n"); return 0; }
-int waveOutSetVolume() { PRINT("Called: waveOutSetVolume\n"); return 0; }
+typedef struct _UEFI_WAVEOUT UEFI_WAVEOUT, *HWAVEOUT;
+
+extern UINT32 waveOutOpen(HWAVEOUT* phwo, UINT32 DeviceId, UINT32 SampleRate, UINT16 Channels);
+extern UINT32 waveOutWrite(HWAVEOUT hwo, void* lpData, UINT32 dwBufferLength);
+extern UINT32 waveOutPause(HWAVEOUT hwo);
+extern UINT32 waveOutRestart(HWAVEOUT hwo);
+extern UINT32 waveOutSetVolume(HWAVEOUT hwo, UINT32 dwVolume);
+extern UINT32 waveOutPrepareHeader(HWAVEOUT hwo, void* lpWaveHdr, UINT32 dwSize);
+extern UINT32 waveOutUnprepareHeader(HWAVEOUT hwo, void* lpWaveHdr, UINT32 dwSize);
+extern UINT32 waveOutReset(HWAVEOUT hwo);
+extern UINT32 waveOutClose(HWAVEOUT hwo);
 
 FARPROC GetProcAddress(HMODULE, LPCSTR func) {
     PRINT("Called: GetProcAddress with func: %s\n", func);

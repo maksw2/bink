@@ -193,46 +193,42 @@ bool LoadBinkDLL(EFI_FILE_HANDLE volume) {
 
 EFI_STATUS SetMaxResolution(EFI_GRAPHICS_OUTPUT_PROTOCOL *Gop) {
     EFI_STATUS Status;
-    EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *MaxModeInfo;
-    UINTN MaxModeNumber;
+    UINT32 MaxWidth = 0;
+    UINT32 MaxHeight = 0;
+    UINTN MaxModeNumber = 0;
+    BOOLEAN ModeFound = FALSE;
 
-    // Iterate through all available modes to find the one with the maximum resolution
-    MaxModeNumber = 0;
-    MaxModeInfo = NULL;
     for (UINTN i = 0; i < Gop->Mode->MaxMode; i++) {
         EFI_GRAPHICS_OUTPUT_MODE_INFORMATION *Info;
         UINTN SizeOfInfo;
 
         Status = Gop->QueryMode(Gop, i, &SizeOfInfo, &Info);
-        if (EFI_ERROR(Status)) {
-            continue;
+        if (EFI_ERROR(Status)) continue;
+
+        // Compare based on total pixels or horizontal/vertical
+        if (Info->HorizontalResolution > MaxWidth || 
+           (Info->HorizontalResolution == MaxWidth && Info->VerticalResolution > MaxHeight)) {
+            
+            MaxWidth = Info->HorizontalResolution;
+            MaxHeight = Info->VerticalResolution;
+            MaxModeNumber = i;
+            ModeFound = TRUE;
         }
 
-        // Compare resolutions
-        if (Info->HorizontalResolution > Gop->Mode->Info->HorizontalResolution ||
-            (Info->HorizontalResolution == Gop->Mode->Info->HorizontalResolution && Info->VerticalResolution > Gop->Mode->Info->VerticalResolution)) {
-            MaxModeNumber = i;
-            MaxModeInfo = Info;
-        }
+        // Always free
+        FreePool(Info);
     }
 
-    if (MaxModeInfo) {
-        printf("Found max resolution mode: %u x %u at mode %u\n",
-              MaxModeInfo->HorizontalResolution, MaxModeInfo->VerticalResolution, MaxModeNumber);
-        
-        // Set the mode to the maximum resolution
+    if (ModeFound) {
+        Print(L"Setting resolution: %u x %u (Mode %u)\n", MaxWidth, MaxHeight, MaxModeNumber);
         Status = Gop->SetMode(Gop, MaxModeNumber);
         if (EFI_ERROR(Status)) {
-            printf("Failed to set mode: %r\n", Status);
-        } else {
-            printf("Successfully set max resolution mode.\n");
+            Print(L"Error: Could not set graphics mode. %r\n", Status);
         }
-        FreePool(MaxModeInfo); // Free the memory for MaxModeInfo
     } else {
-        printf("Could not find a valid mode.\n");
         Status = EFI_NOT_FOUND;
     }
-    
+
     return Status;
 }
 
@@ -324,7 +320,7 @@ void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Go
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     InitializeLib(ImageHandle, SystemTable);
     SystemTable->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
-    printf("Hello, World!\n");
+    Print(L"Hello, World!\n");
 
     VOID* HeapMemory = NULL;
     UINTN AllocationSize = 512 * 1024 * 1024; // 512 MB
@@ -338,7 +334,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     );
 
     if (EFI_ERROR(Status)) {
-        printf("Failed to allocate memory pool pages: %r\n", Status);
+        Print(L"Failed to allocate memory pool pages: %r\n", Status);
         gBS->Stall(5 * 1000 * 1000);
         gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
         return Status;
@@ -372,7 +368,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     printf("BinkSet* called\n");
 
-    void* video_file = LoadFile(volume, L"video.bk2");
+    void* video_file = LoadFile(volume, L"apple.bk2");
 
     printf("Video file loaded into memory\n");
 
@@ -386,7 +382,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     // Allocate framebuffer
     uint32_t* framebuffer = (uint32_t*)Malloc(width * height * sizeof(uint32_t));
     if (!framebuffer) {
-        printf("Failed to allocate framebuffer!\n");
+        Print(L"Failed to allocate framebuffer!\n");
         gBS->Stall(5 * 1000 * 1000);
         pBinkClose(bink);
         Free(video_file);
@@ -404,7 +400,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
         EFI_STATUS key_status = gST->ConIn->ReadKeyStroke(gST->ConIn, &key);
         if (key_status == EFI_SUCCESS) {
             if (key.UnicodeChar == 'q') {
-                printf("\nExiting");
+                Print(L"\nExiting");
                 break;
             }
             else if (key.UnicodeChar == 'r') {
@@ -421,7 +417,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
         // Check if the video is done
         if (bink->FrameNum >= bink->Frames) {
-            printf("\nVideo playback finished!");
+            Print(L"\nVideo playback finished!");
             break; // exit the loop if the video is done
         }
         
@@ -441,7 +437,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
         int code = pBinkDoFrame(bink);
         if (code != 0) {
-            printf("BinkDoFrame failed!\n");
+            Print(L"BinkDoFrame failed!\n");
             pBinkClose(bink);
             Free(video_file);
             Free(framebuffer);
@@ -479,16 +475,16 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
             printf("\rframe %d done    ", bink->FrameNum);
     }
 
-    printf("\nTotal skipped frames: %llu\n", skipped);
+    Print(L"\nTotal skipped frames: %llu\n", skipped);
     if (skipped > 100)
-        printf("oof\n");
+        Print(L"oof\n");
 
     pBinkClose(bink);
 
     Free(video_file);
     Free(framebuffer);
 
-    printf("Exiting...\n");
+    Print(L"Exiting...\n");
     gBS->Stall(2 * 1000 * 1000);
     gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
 
