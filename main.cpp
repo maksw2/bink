@@ -324,7 +324,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     VOID* HeapMemory = NULL;
     UINTN AllocationSize = 512 * 1024 * 1024; // 512 MB
-    UINTN Pages = AllocationSize / 4096;      // UEFI page size is 4KB
+    UINTN Pages = AllocationSize / EFI_PAGE_SIZE;
 
     EFI_STATUS Status = gBS->AllocatePages(
         AllocateAnyPages,

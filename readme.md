@@ -47,8 +47,11 @@ A: Science isn't about 'why', it's about 'why not'.
 Q: Why not raw frames?  
 A: Too simple.
 
+Q: How did you implement file I/O?
+A: I didn't. I just preload the entire video into memory.
+
 Q: Is this finished?  
-A: Some parts yes.
+A: Mostly yes.
 
 Q: Can I use this in production?  
 A: Define production.
