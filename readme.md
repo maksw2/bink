@@ -18,17 +18,19 @@ pretty cool right?
 
 ## what is it?
 
-a simple bink player.. running under uefi!
+a ~~microkernel in denial~~ simple bink player.. running under uefi!
 
 ## how?
 
 from the outside it looks like wine but less running under uefi instead of linux.  
 i respect the firmware, but i also make it dance.
 
+i shim a subset of win32 calls up to vista (nt 6) and load the proprietary blob (dll).
+
 ## legal?
 
 nobody noticed this yet.  
-either a job offer or a C&D 🙏
+either a job offer or a C&D 🙏 (rad don't kill me)
 
 ## how 2 build
 
@@ -65,10 +67,13 @@ Q: How did you implement file I/O?
 A: I didn't. I just preload the entire video into memory.
 
 Q: Is this finished?  
-A: Mostly yes.
+A: Mostly.
 
 Q: Can I use this in production?  
 A: Define production.
 
 Q: Will you add audio?  
 A: soon™
+
+Q: When?  
+A: When it's ready.

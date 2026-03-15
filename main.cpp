@@ -71,7 +71,7 @@ UINT64 FileSize(EFI_FILE_HANDLE FileHandle) {
     return size;
 }
 
-void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
+void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename, UINT64* out_size, bool just_the_size_please) {
     EFI_FILE_HANDLE file;
     EFI_STATUS file_loading_status = volume->Open(volume, &file, (wchar_t*)filename,
         EFI_FILE_MODE_READ, 0);
@@ -85,6 +85,16 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
     if (file_size == 0) {
         file->Close(file);
         return NULL;
+    }
+
+    if (just_the_size_please) {
+        *out_size = file_size;
+        file->Close(file);
+        return NULL;
+    }
+
+    if (out_size) {
+        *out_size = file_size;
     }
 
     VOID* file_buffer = Malloc(file_size);
@@ -113,12 +123,7 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
     return file_buffer;
 }
 
-bool LoadBinkDLL(EFI_FILE_HANDLE volume) {
-    void* binkFileBuffer = LoadFile(volume, L"bink2w64.dll");
-    if (!binkFileBuffer) {
-        return false;
-    }
-
+bool LoadBinkDLL(EFI_FILE_HANDLE volume, void* binkFileBuffer) {
     void* binkBase = LoadPeImage(binkFileBuffer);
     Free(binkFileBuffer); // Free the file buffer, as LoadPeImage copied it.
     if (!binkBase) {
@@ -261,7 +266,7 @@ void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Go
     UINT32 stride = Gop->Mode->Info->PixelsPerScanLine;
     uint32_t* fb_base = (uint32_t*)Gop->Mode->FrameBufferBase;
 
-    // 1. Allocate a single contiguous buffer for the BMP (Header + Pixels)
+    // Allocate a single contiguous buffer for the BMP (Header + Pixels)
     UINTN total_pixel_bytes = width * height * 4;
     UINTN total_file_size = sizeof(BMP_HEADER) + total_pixel_bytes;
     uint8_t* file_buffer = (uint8_t*)AllocatePool(total_file_size);
@@ -271,7 +276,7 @@ void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Go
         return;
     }
 
-    // 2. Setup Header
+    // Setup Header
     BMP_HEADER* header = (BMP_HEADER*)file_buffer;
     SetMem(header, sizeof(BMP_HEADER), 0);
     header->type = 0x4D42;
@@ -283,7 +288,7 @@ void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Go
     header->planes = 1;
     header->bpp = 32;
 
-    // 3. Copy pixels to buffer while stripping Stride and fixing Alpha
+    // Copy pixels to buffer while stripping Stride and fixing Alpha
     uint32_t* dst_pixels = (uint32_t*)(file_buffer + sizeof(BMP_HEADER));
     __m256i alpha_mask = _mm256_set1_epi32(0xFF000000); // Mask to force Alpha to 255
 
@@ -304,7 +309,7 @@ void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Go
         }
     }
 
-    // 4. One single disk write (Massively faster)
+    // One single disk write (Massively faster)
     EFI_FILE_HANDLE file;
     EFI_STATUS status = volume->Open(volume, &file, (CHAR16*)L"screen.bmp", 
                                      EFI_FILE_MODE_READ | EFI_FILE_MODE_WRITE | EFI_FILE_MODE_CREATE, 0);
@@ -318,12 +323,26 @@ void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Go
 }
 
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
+    const wchar_t* filename = L"video.bk2";
     InitializeLib(ImageHandle, SystemTable);
     SystemTable->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
     Print(L"Hello, World!\n");
 
+    EFI_FILE_HANDLE volume = GetVolume(ImageHandle);
+    if (EFI_ERROR(volume)) {
+        Print(L"Failed to get volume!\n");
+        gBS->Stall(5 * 1000 * 1000);
+        gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+        return 1;
+    }
+
+    printf("Got volume\n");
+
+    UINT64 filesize = 0;
+    LoadFile(volume, filename, &filesize, true);
+
     VOID* HeapMemory = NULL;
-    UINTN AllocationSize = 512 * 1024 * 1024; // 512 MB
+    UINT64 AllocationSize = filesize + 64 * 1024 * 1024; // file size + 64MB for heap
     UINTN Pages = AllocationSize / EFI_PAGE_SIZE;
 
     EFI_STATUS Status = gBS->AllocatePages(
@@ -348,12 +367,15 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     SetMaxResolution(gop);
 
-    enable_avx2();
+    VOID* binkFileBuffer = LoadFile(volume, L"bink2w64.dll", &filesize, false);
+    if (!binkFileBuffer) {
+        printf("Failed to load Bink DLL into memory!\n");
+        gBS->Stall(5 * 1000 * 1000);
+        gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+        return 1;
+    }
 
-    EFI_FILE_HANDLE volume = GetVolume(ImageHandle);
-    printf("Got volume\n");
-
-    if (!LoadBinkDLL(volume)) {
+    if (!LoadBinkDLL(volume, binkFileBuffer)) {
         printf("Failed to load Bink Video DLL\n");
         gBS->Stall(5 * 1000 * 1000);
         gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
@@ -362,13 +384,19 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     printf("Bink function pointers initialized!\n");
 
-    //pBinkSetSoundSystem(pBinkOpenWaveOut, 0);
     pBinkSetMemory((BINKMEMALLOC)Malloc, (BINKMEMFREE)Free);
+    //pBinkSetSoundSystem(pBinkOpenWaveOut, 0); // in progress
     pBinkSetIO(0); // no io
 
     printf("BinkSet* called\n");
 
-    void* video_file = LoadFile(volume, L"apple.bk2");
+    void* video_file = LoadFile(volume, filename, NULL, false);
+    if (!video_file) {
+        printf("Failed to load video file into memory!\n");
+        gBS->Stall(5 * 1000 * 1000);
+        gST->RuntimeServices->ResetSystem(EfiResetShutdown, EFI_SUCCESS, 0, NULL);
+        return 1;
+    }
 
     printf("Video file loaded into memory\n");
 
@@ -454,7 +482,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
             height,
             0,
             0,
-            BINKSURFACE32 | BINKCOPYALL
+            BINKSURFACE32
         );
         
         pBinkNextFrame(bink);
