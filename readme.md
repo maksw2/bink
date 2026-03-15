@@ -39,6 +39,20 @@ open x64 vs dev prompt
 
 the video to play is fatroot/video.bk2
 
+## how hard was it?
+
+> Bink file handlers are slightly more complicated to write on generic x86, because Bink doesn't handle the threading for you. Drop us an email, and we can send you the default file IO system, and so that you can modify it for your platform.
+
+> We can send you many different source examples for various sound systems (waveOut, SDL, CoreAudio, etc), so that you can get up and running quickly. E-mail us for details.
+
+except i'm a student with no access to the sdk.
+
+> 1. Include bink.h in your source files. You may want to add an directory include to your compiler line in your make file.
+> 2. Add the #define __RADX32__ to your compiler command line.
+> 3. Add the BinkX32Imp.c and RADDLL.c files to your project. These are the files that load the BinkX32.dll binary module.
+
+except i only had the windows dll (bink2w64.dll).
+
 ## q&a
 
 Q: Why does it exist?  
