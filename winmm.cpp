@@ -191,18 +191,16 @@ typedef union _LARGE_INTEGER {
     long long QuadPart;
 } LARGE_INTEGER;
 
-typedef struct _UEFI_WAVEOUT UEFI_WAVEOUT, *HWAVEOUT;
-
-UINT32 waveOutOpen(HWAVEOUT* phwo, UINT32 DeviceId, UINT32 SampleRate, UINT16 Channels) { return 0; }
-UINT32 waveOutWrite(HWAVEOUT hwo, void* lpData, UINT32 dwBufferLength) { return 0; }
-UINT32 waveOutPause(HWAVEOUT hwo) { return 0; }
-UINT32 waveOutRestart(HWAVEOUT hwo) { return 0; }
-UINT32 waveOutSetVolume(HWAVEOUT hwo, UINT32 dwVolume) { return 0; }
-UINT32 waveOutPrepareHeader(HWAVEOUT hwo, void* lpWaveHdr, UINT32 dwSize) { return 0; }
-UINT32 waveOutUnprepareHeader(HWAVEOUT hwo, void* lpWaveHdr, UINT32 dwSize) { return 0; }
-UINT32 waveOutGetPosition(HWAVEOUT hwo, void* lpInfo, UINT32 dwSize) { return 0; }
-UINT32 waveOutReset(HWAVEOUT hwo) { return 0; }
-UINT32 waveOutClose(HWAVEOUT hwo) { return 0; }
+UINT32 waveOutOpen() { return 0; }
+UINT32 waveOutWrite() { return 0; }
+UINT32 waveOutPause() { return 0; }
+UINT32 waveOutRestart() { return 0; }
+UINT32 waveOutSetVolume() { return 0; }
+UINT32 waveOutPrepareHeader() { return 0; }
+UINT32 waveOutUnprepareHeader() { return 0; }
+UINT32 waveOutGetPosition() { return 0; }
+UINT32 waveOutReset() { return 0; }
+UINT32 waveOutClose() { return 0; }
 
 extern int stricmp(const char *s1, const char *s2);
 

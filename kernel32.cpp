@@ -422,17 +422,15 @@ BOOL InitializeCriticalSectionAndSpinCount(LPCRITICAL_SECTION lpCriticalSection,
     return TRUE;
 }
 
-typedef struct _UEFI_WAVEOUT UEFI_WAVEOUT, *HWAVEOUT;
-
-extern UINT32 waveOutOpen(HWAVEOUT* phwo, UINT32 DeviceId, UINT32 SampleRate, UINT16 Channels);
-extern UINT32 waveOutWrite(HWAVEOUT hwo, void* lpData, UINT32 dwBufferLength);
-extern UINT32 waveOutPause(HWAVEOUT hwo);
-extern UINT32 waveOutRestart(HWAVEOUT hwo);
-extern UINT32 waveOutSetVolume(HWAVEOUT hwo, UINT32 dwVolume);
-extern UINT32 waveOutPrepareHeader(HWAVEOUT hwo, void* lpWaveHdr, UINT32 dwSize);
-extern UINT32 waveOutUnprepareHeader(HWAVEOUT hwo, void* lpWaveHdr, UINT32 dwSize);
-extern UINT32 waveOutReset(HWAVEOUT hwo);
-extern UINT32 waveOutClose(HWAVEOUT hwo);
+extern UINT32 waveOutOpen();
+extern UINT32 waveOutWrite();
+extern UINT32 waveOutPause();
+extern UINT32 waveOutRestart();
+extern UINT32 waveOutSetVolume();
+extern UINT32 waveOutPrepareHeader();
+extern UINT32 waveOutUnprepareHeader();
+extern UINT32 waveOutReset();
+extern UINT32 waveOutClose();
 
 FARPROC GetProcAddress(HMODULE, LPCSTR func) {
     PRINT("Called: GetProcAddress with func: %s\n", func);

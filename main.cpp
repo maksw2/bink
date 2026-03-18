@@ -401,7 +401,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
     printf("Video file loaded into memory\n");
 
     HBINK bink = NULL;
-    bink = pBinkOpen((const char*)video_file, BINKFROMMEMORY | BINKNOSKIP | BINKNOTHREADEDIO);
+    bink = pBinkOpen((const char*)video_file, BINKFROMMEMORY | BINKNOTHREADEDIO);
     printf("Opened Bink!\n");
 
     int width = bink->Width, height = bink->Height;
@@ -511,6 +511,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     Free(video_file);
     Free(framebuffer);
+
+    gBS->FreePages((EFI_PHYSICAL_ADDRESS)HeapMemory, Pages);
 
     Print(L"Exiting...\n");
     gBS->Stall(2 * 1000 * 1000);
