@@ -71,7 +71,7 @@ UINT64 FileSize(EFI_FILE_HANDLE FileHandle) {
     return size;
 }
 
-void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename, UINT64* out_size, bool just_the_size_please) {
+void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename) {
     EFI_FILE_HANDLE file;
     EFI_STATUS file_loading_status = volume->Open(volume, &file, (wchar_t*)filename,
         EFI_FILE_MODE_READ, 0);
@@ -87,17 +87,7 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename, UINT64* out_size
         return NULL;
     }
 
-    if (just_the_size_please) {
-        *out_size = file_size;
-        file->Close(file);
-        return NULL;
-    }
-
-    if (out_size) {
-        *out_size = file_size;
-    }
-
-    VOID* file_buffer = Malloc(file_size);
+    VOID* file_buffer = AllocatePool(file_size);
     if (!file_buffer) { return NULL; }
 
     SetMem(file_buffer, file_size, 0);
@@ -110,13 +100,13 @@ void* LoadFile(EFI_FILE_HANDLE volume, const wchar_t* filename, UINT64* out_size
     if (EFI_ERROR(file_loading_status)) {
         printf("Failed to read file: %r\n", file_loading_status);
         // Free the allocated memory if the read fails
-        Free(file_buffer);
+        FreePool(file_buffer);
         return NULL;
     }
 
     if (read_size != file_size) {
         printf("Read size mismatch: expected %llu, got %llu\n", file_size, read_size);
-        Free(file_buffer);
+        FreePool(file_buffer);
         return NULL;
     }
 
@@ -323,7 +313,7 @@ void SavePhysicalScreen(EFI_FILE_HANDLE volume, EFI_GRAPHICS_OUTPUT_PROTOCOL* Go
 }
 
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
-    const wchar_t* filename = L"video.bk2";
+    const wchar_t* filename = L"apple.bk2";
     InitializeLib(ImageHandle, SystemTable);
     SystemTable->BootServices->SetWatchdogTimer(0, 0, 0, NULL);
     Print(L"Hello, World!\n");
@@ -338,11 +328,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     printf("Got volume\n");
 
-    UINT64 filesize = 0;
-    LoadFile(volume, filename, &filesize, true);
-
     VOID* HeapMemory = NULL;
-    UINT64 AllocationSize = filesize + 64 * 1024 * 1024; // file size + 64MB for heap
+    UINT64 AllocationSize = 64 * 1024 * 1024; // 64MB for heap
     UINTN Pages = AllocationSize / EFI_PAGE_SIZE;
 
     EFI_STATUS Status = gBS->AllocatePages(
@@ -367,7 +354,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     SetMaxResolution(gop);
 
-    VOID* binkFileBuffer = LoadFile(volume, L"bink2w64.dll", &filesize, false);
+    VOID* binkFileBuffer = LoadFile(volume, L"bink2w64.dll");
     if (!binkFileBuffer) {
         printf("Failed to load Bink DLL into memory!\n");
         gBS->Stall(5 * 1000 * 1000);
@@ -390,7 +377,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE* SystemTable) {
 
     printf("BinkSet* called\n");
 
-    void* video_file = LoadFile(volume, filename, NULL, false);
+    void* video_file = LoadFile(volume, filename);
     if (!video_file) {
         printf("Failed to load video file into memory!\n");
         gBS->Stall(5 * 1000 * 1000);
